@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Скрипка — играй по нотам</title>
+<style>
+  :root{
+    --bg:#f6f5f2; --card:#fff; --ink:#1d1c1a; --muted:#6f6b64; --line:#d9d5cd;
+    --accent:#2f6fed; --ok:#1f9e5a; --warn:#d99000; --bad:#d2412f; --low:#7b4fd6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#14140f; --card:#1e1e19; --ink:#f0eee8; --muted:#a09a90; --line:#3a3931;
+           --accent:#6f9dff; --ok:#3fbf7d; --warn:#e5aa2a; --bad:#f0685a; --low:#a88cf5; }
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  .okflash.count{background:var(--accent)}
+  .okflash{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:8px;
+           padding:8px 16px;border-radius:999px;box-shadow:0 2px 10px rgba(0,0,0,.18);white-space:nowrap;
+           background:var(--ok);color:#fff;pointer-events:none;opacity:0;font-size:15px;font-weight:600}
+  .okflash b{font-size:17px;line-height:1}
+  .okflash span{font-weight:500}
+  .okflash.show{animation:okflash .9s ease-out}
+  @keyframes okflash{0%{opacity:0}10%{opacity:1}70%{opacity:1}100%{opacity:0}}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       -webkit-text-size-adjust:100%;}
+  .wrap{max-width:1400px;margin:0 auto;padding:20px 16px 64px}
+  h1{font-size:22px;margin:0 0 14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+  .pick{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;
+        padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+  .opts{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px}
+  .opts label{display:flex;align-items:center;gap:8px}
+  .opts select{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;
+               padding:8px 10px;font:inherit;font-size:15px;cursor:pointer}
+  .lt{font-size:14px;color:var(--muted);margin-right:2px}
+  .tempo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+  .tempo input[type=number]{width:64px;padding:7px 4px;border:1px solid var(--line);border-radius:10px;background:transparent;
+                            color:var(--ink);font:inherit;font-weight:600;text-align:center}
+  .tempo .step{width:40px;padding:6px 0;font-size:18px;line-height:1.2}
+  .chk{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;margin-left:6px}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px;margin-left:10px}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+  .target{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .bignote{font-size:44px;font-weight:600;line-height:1;min-width:110px}
+  .bignote small{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:6px}
+
+  .playrow{display:flex;gap:10px;align-items:flex-start;margin-bottom:16px}
+  .playrow #sheetCard{flex:1;min-width:0;margin-bottom:0;position:relative;overflow-y:auto;
+                      height:min(440px,calc(100vh - 16px));padding-top:6px;padding-bottom:6px}
+  .vmeter{position:sticky;top:8px;width:84px;flex:none;margin-bottom:0;padding:10px 8px;
+          display:flex;flex-direction:column;align-items:center;text-align:center;
+          height:min(440px,calc(100vh - 16px))}
+  .vmeter .lab{font-size:11px;color:var(--muted);line-height:1.2}
+  .vmeter .hz{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .vmeter .nm{font-size:19px;font-weight:600;line-height:1.1;hyphens:none}
+  .vmeter .want{color:var(--accent)}
+  .vmeter .end{font-size:11px;color:var(--muted);margin:6px 0 2px}
+  @media (max-width:480px){
+    .playrow{gap:6px} .playrow #sheetCard{padding:8px 6px}
+    .vmeter{width:70px;padding:8px 4px} .fboard{width:70px} .vmeter .nm{font-size:16px} .vmeter .hz{font-size:12px}
+  }
+  /* шкала ±50 центов: 1 цент = 1% высоты; зелёная зона — «чисто» по выбранному уровню (--c), жёлтая — ещё 15 центов */
+  .needle{--c:20%;--w:35%;position:relative;flex:1;min-height:120px;width:40px;border-radius:8px;overflow:hidden;
+          background:linear-gradient(180deg,
+            var(--line) 0%, var(--line) calc(50% - var(--w)),
+            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% - var(--w)),
+            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% - var(--c)),
+            color-mix(in srgb,var(--ok) 45%,transparent) calc(50% - var(--c)),
+            color-mix(in srgb,var(--ok) 45%,transparent) calc(50% + var(--c)),
+            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% + var(--c)),
+            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% + var(--w)),
+            var(--line) calc(50% + var(--w)), var(--line) 100%);}
+  .needle i{position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2.5px;background:var(--ink);
+            border-radius:2px;transition:top .06s linear;opacity:.15}
+  .needle i.live{opacity:1}
+  .fboard{position:sticky;top:8px;width:92px;flex:none;margin-bottom:0;padding:8px 4px;
+          display:flex;flex-direction:column;align-items:center;text-align:center;
+          height:min(440px,calc(100vh - 16px))}
+  .fboard svg{flex:1;min-height:0;width:100%}
+  .fb-wood{fill:#2b2620} .fb-nut{fill:#e9e2d0} .fb-str{stroke:#cfc8b8;stroke-width:1.3}
+  .fb-tape{stroke:#8a8273;stroke-width:1;stroke-dasharray:2 2}
+  .fb-lab{fill:var(--ink);font-size:11px;font-weight:600;text-anchor:middle}
+  .fb-want{fill:var(--accent)} .fb-want-t{fill:#fff;font-size:10px;font-weight:700;text-anchor:middle}
+  .fb-open{fill:none;stroke:var(--accent);stroke-width:2.5}
+  .fb-heard{fill:var(--warn)} .fb-heard.ok{fill:var(--ok)}
+  .fb-arrow{stroke:var(--warn);stroke-width:2.5;fill:none}
+  .fb-head{fill:var(--warn)}
+  .fbtip{font-size:12px;line-height:1.25;min-height:46px;margin-top:4px;font-weight:600}
+  .fbtip.ok{color:var(--ok)} .fbtip.move{color:var(--warn)}
+  .needle u{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--ink);opacity:.35}
+
+  .btns{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px}
+  /* настройка скрипки */
+  body.tuning #pickerCard, body.tuning .playrow, body.tuning #targetCard{display:none}
+  .tuner .thead{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:12px}
+  .tuner .thead b{font-size:18px}
+  .tuner .thead span{color:var(--muted);font-size:14px}
+  .tstrings{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .tchip{border:2px solid var(--line);background:transparent;color:var(--ink);border-radius:12px;padding:8px 4px;
+         font:inherit;cursor:pointer;text-align:center;line-height:1.2}
+  .tchip b{display:block;font-size:20px}
+  .tchip small{color:var(--muted);font-size:12px}
+  .tchip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .tchip.sel{box-shadow:inset 0 0 0 2px var(--accent)}
+  .tchip.ok{border-color:var(--ok)}
+  .tchip.ok b::after{content:' ✓';color:var(--ok)}
+  .tnow{display:flex;align-items:baseline;gap:12px;margin:16px 0 0;flex-wrap:wrap}
+  .tnow .tbig{font-size:40px;font-weight:700;line-height:1}
+  .tnow span{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+  .tmeter{position:relative;height:40px;margin-top:10px;border-radius:8px;overflow:hidden;
+          background:linear-gradient(90deg,var(--line) 0%,var(--line) 45%,
+            color-mix(in srgb,var(--ok) 50%,transparent) 45%,color-mix(in srgb,var(--ok) 50%,transparent) 55%,
+            var(--line) 55%,var(--line) 100%)}
+  .tmeter i{position:absolute;top:0;bottom:0;left:50%;width:5px;margin-left:-2.5px;background:var(--ink);border-radius:2px;
+            transition:left .06s linear;opacity:.15}
+  .tmeter i.live{opacity:1} .tmeter i.ok{background:var(--ok)}
+  .tmeter u{position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--ink);opacity:.35}
+  .tlab{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:4px}
+  .ttip{font-size:16px;font-weight:600;min-height:48px;margin:12px 0 4px}
+  .ttip.ok{color:var(--ok)} .ttip.move{color:var(--warn)}
+  .tuner .btns{margin:8px 0 0}
+  button.act{border:0;border-radius:10px;padding:12px 18px;font:inherit;font-weight:600;cursor:pointer;
+             background:var(--accent);color:#fff}
+  button.act.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:400}
+  button.act:disabled{opacity:.4;cursor:default}
+
+  #sheet{overflow-x:hidden}
+  #sheet svg{display:block;width:100%;height:auto}
+  .staffline{stroke:var(--ink);stroke-width:1;opacity:.55}
+  .bar{stroke:var(--ink);stroke-width:1.2;opacity:.55}
+  .clef{fill:var(--ink);font-size:46px;dominant-baseline:middle}
+  .nh{fill:var(--ink)}
+  .nh.hollow{fill:none;stroke:var(--ink);stroke-width:2}
+  .stem{stroke:var(--ink);stroke-width:1.6;fill:none}
+  .acc{fill:var(--ink);font-size:19px}
+  .fing{fill:var(--muted);font-size:11px;text-anchor:middle}
+  .ledger{stroke:var(--ink);stroke-width:1;opacity:.55}
+  .hl{fill:var(--accent);opacity:0}
+  #sheet g[class] .nh.hollow{fill:none}
+  .n-cur .hl{opacity:.16}
+  .n-ok .hl,.n-mid .hl,.n-bad .hl{fill:var(--ok);opacity:.22}   /* нота сыграна — зелёный фон */
+  .n-cur .nh,.n-cur .nh.hollow{fill:var(--accent);stroke:var(--accent);stroke-width:3}
+  .n-cur .stem{stroke:var(--accent);stroke-width:2.6} .n-cur .acc{fill:var(--accent)}
+  .n-cur .fing{fill:var(--accent);font-size:15px;font-weight:700}
+  .n-ok .nh,.n-ok .nh.hollow{fill:var(--ok);stroke:var(--ok)} .n-ok .stem{stroke:var(--ok)} .n-ok .acc{fill:var(--ok)}
+  .n-mid .nh,.n-mid .nh.hollow{fill:var(--warn);stroke:var(--warn)} .n-mid .stem{stroke:var(--warn)} .n-mid .acc{fill:var(--warn)}
+  .n-bad .nh,.n-bad .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-bad .stem{stroke:var(--bad)} .n-bad .acc{fill:var(--bad)}
+  /* режим «в темпе»: высоко — красная, низко — фиолетовая (синий уже занят текущей нотой), не услышал — серая */
+  .n-hi .hl{fill:var(--bad);opacity:.22} .n-lo .hl{fill:var(--low);opacity:.24} .n-miss .hl{fill:var(--muted);opacity:.2}
+  .n-hi .nh,.n-hi .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-hi .stem{stroke:var(--bad)} .n-hi .acc{fill:var(--bad)}
+  .n-lo .nh,.n-lo .nh.hollow{fill:var(--low);stroke:var(--low)} .n-lo .stem{stroke:var(--low)} .n-lo .acc{fill:var(--low)}
+  .n-miss .nh,.n-miss .nh.hollow{fill:var(--muted);stroke:var(--muted)} .n-miss .stem{stroke:var(--muted)} .n-miss .acc{fill:var(--muted)}
+  /* стрелка на текущей ноте: играешь выше — вверх (красная), ниже — вниз (фиолетовая), как цвета в режиме «в темпе» */
+  .arr{display:none;fill:none;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+  .arr.halo{stroke:var(--card);stroke-width:8}
+  .arr.up:not(.halo){stroke:var(--bad)} .arr.down:not(.halo){stroke:var(--low)}
+  .n-cur.n-up .arr.up, .n-cur.n-down .arr.down{display:inline}
+  .cursor{fill:var(--accent)}
+  .status{font-size:14px;color:var(--muted);min-height:22px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Играй по нотам</h1>
+  <div class="btns">
+    <button class="act" id="btnStart">Начать</button>
+    <button class="act ghost" id="btnSkip" disabled>Пропустить ноту</button>
+    <button class="act ghost" id="btnDemo">Демо (без скрипки)</button>
+    <button class="act ghost" id="btnReset">Заново</button>
+    <button class="act ghost" id="btnTune">Настроить скрипку</button>
+  </div>
+
+  <div class="card tuner" id="tuner" hidden>
+    <div class="thead"><b>Настройка скрипки</b><span>Нажми «Слушать» и проведи смычком по открытой струне — ровно и долго.</span></div>
+    <div class="tstrings" id="tStrings"></div>
+    <div class="tnow"><span class="tbig" id="tNote">—</span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
+    <div class="tmeter"><u></u><i id="tNeedle"></i></div>
+    <div class="tlab"><span>ниже</span><span>чисто</span><span>выше</span></div>
+    <div class="ttip" id="tTip"></div>
+    <div class="btns">
+      <button class="act" id="tListen">Слушать</button>
+      <button class="act ghost" id="tPlay">▶ Послушать струну</button>
+      <button class="act ghost" id="tDone">Готово, играть</button>
+    </div>
+  </div>
+
+  <div class="card" id="pickerCard">
+    <div class="opts">
+      <label><span class="lt">Мелодия:</span><select id="melodySel" autocomplete="off"></select></label>
+      <label><span class="lt">Уровень:</span><select id="levelSel" autocomplete="off"></select></label>
+      <label><span class="lt">Режим:</span><select id="modeSel" autocomplete="off">
+        <option value="wait">Жду каждую ноту</option>
+        <option value="tempo">В темпе</option>
+      </select></label>
+    </div>
+    <div class="tempo" id="tempoBox" hidden>
+      <span class="lt">Темп:</span>
+      <button class="pick step" id="bpmMinus" aria-label="медленнее">−</button>
+      <input id="bpm" type="number" min="30" max="160" step="5" inputmode="numeric">
+      <button class="pick step" id="bpmPlus" aria-label="быстрее">+</button>
+      <span class="lt">ударов в минуту</span>
+      <label class="chk"><input type="checkbox" id="metro">щелчки метронома</label>
+      <div class="legend">
+        <span><i style="background:var(--ok)"></i>чисто</span>
+        <span><i style="background:var(--bad)"></i>высоко</span>
+        <span><i style="background:var(--low)"></i>низко</span>
+        <span><i style="background:var(--muted)"></i>не услышал</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="playrow">
+    <div class="card fboard">
+      <svg id="board" viewBox="0 0 96 300" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="fbtip" id="fbTip"></div>
+    </div>
+    <div class="card vmeter">
+      <span class="lab">нужно</span>
+      <b class="nm want" id="wantNote">—</b>
+      <span class="hz" id="needHz">—</span>
+      <span class="end">выше</span>
+      <div class="needle"><u></u><i id="needle"></i></div>
+      <span class="end">ниже</span>
+      <span class="lab">играешь</span>
+      <b class="nm" id="heardNote">·</b>
+      <span class="hz" id="playHz">—</span>
+      <span class="lab" id="heardInfo">тишина</span>
+    </div>
+    <div class="card" id="sheetCard">
+      <div id="sheet"></div>
+    </div>
+  </div>
+
+  <div class="card" id="targetCard">
+    <div class="target">
+      <div class="bignote" id="targetNote">—<small id="targetHow">выбери мелодию</small></div>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+</div>
+
+<script>
+/* ---------- ноты ---------- */
+const SEMI={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+const LI={C:0,D:1,E:2,F:3,G:4,A:5,B:6};
+const RU={C:'до',D:'ре',E:'ми',F:'фа',G:'соль',A:'ля',B:'си'};
+
+function parseNote(s){
+  const m=/^([A-G])(#?)(\d)$/.exec(s);
+  const letter=m[1], sharp=m[2]==='#', oct=+m[3];
+  return {
+    name:s, letter, sharp, oct,
+    midi:(oct+1)*12+SEMI[letter]+(sharp?1:0),
+    step:oct*7+LI[letter],
+    ru:RU[letter]+(sharp?'-диез':'')
+  };
+}
+const STRINGS=[{n:'Соль',m:55},{n:'Ре',m:62},{n:'Ля',m:69},{n:'Ми',m:76}];
+const FING=['0','1 (низкий)','1','2 (низкий)','2','3','3 (высокий)','4'];
+function fingering(midi){
+  let best=null;
+  for(const s of STRINGS){const d=midi-s.m; if(d>=0&&d<=7) best={s,d};}
+  if(!best) return null;
+  return best.d===0
+    ? {text:'открытая струна '+best.s.n, short:'0'}
+    : {text:FING[best.d].replace(/^(\d)/,'$1-й палец')+', струна '+best.s.n, short:FING[best.d]};
+}
+function midiToName(midi){
+  const names=['до','до-диез','ре','ре-диез','ми','фа','фа-диез','соль','соль-диез','ля','ля-диез','си'];
+  const lat=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const i=((midi%12)+12)%12, oct=Math.floor(midi/12)-1;
+  return {ru:names[i], lat:lat[i]+oct};
+}
+
+/* ---------- мелодии ---------- */
+const MELODIES=[
+ {id:'open', title:'Открытые струны', hint:'Ничего не зажимаем — работает только смычок. Каждую струну по два раза.',
+  measures:[[['G3',2],['G3',2]],[['D4',2],['D4',2]],[['A4',2],['A4',2]],[['E5',2],['E5',2]]]},
+ {id:'doremi', title:'До, ре, ми', hint:'Три ноты подряд: до — 3-й палец на струне Соль, ре — открытая струна Ре, ми — 1-й палец на струне Ре.',
+  measures:[[['C4',1],['D4',1],['E4',2]],[['E4',1],['D4',1],['C4',2]],
+            [['C4',1],['D4',1],['E4',1],['D4',1]],[['C4',4]]]},
+ {id:'scale', title:'Гамма ре мажор', hint:'Струны Ре и Ля, первая позиция. Вверх и вниз.',
+  measures:[[['D4',1],['E4',1],['F#4',1],['G4',1]],[['A4',1],['B4',1],['C#5',1],['D5',1]],
+            [['D5',1],['C#5',1],['B4',1],['A4',1]],[['G4',1],['F#4',1],['E4',1],['D4',2]]]},
+ {id:'hot', title:'Три ноты', hint:'Только струна Ля: открытая, 1-й и 2-й палец.',
+  measures:[[['C#5',1],['B4',1],['A4',2]],[['C#5',1],['B4',1],['A4',2]],
+            [['A4',1],['A4',1],['B4',1],['B4',1]],[['C#5',1],['B4',1],['A4',2]]]},
+ {id:'mary', title:'У Мэри был барашек', hint:'Струна Ля плюс открытая Ми.',
+  measures:[[['C#5',1],['B4',1],['A4',1],['B4',1]],[['C#5',1],['C#5',1],['C#5',2]],
+            [['B4',1],['B4',1],['B4',2]],[['C#5',1],['E5',1],['E5',2]],
+            [['C#5',1],['B4',1],['A4',1],['B4',1]],[['C#5',1],['C#5',1],['C#5',1],['C#5',1]],
+            [['B4',1],['B4',1],['C#5',1],['B4',1]],[['A4',4]]]},
+ {id:'twinkle', title:'Ты, звезда моя', hint:'Французская народная песенка. Струны Ля и Ми.',
+  measures:[[['A4',1],['A4',1],['E5',1],['E5',1]],[['F#5',1],['F#5',1],['E5',2]],
+            [['D5',1],['D5',1],['C#5',1],['C#5',1]],[['B4',1],['B4',1],['A4',2]],
+            [['E5',1],['E5',1],['D5',1],['D5',1]],[['C#5',1],['C#5',1],['B4',2]],
+            [['E5',1],['E5',1],['D5',1],['D5',1]],[['C#5',1],['C#5',1],['B4',2]],
+            [['A4',1],['A4',1],['E5',1],['E5',1]],[['F#5',1],['F#5',1],['E5',2]],
+            [['D5',1],['D5',1],['C#5',1],['C#5',1]],[['B4',1],['B4',1],['A4',2]]]},
+ {id:'row', title:'Лодочка', hint:'Немецкая народная песенка («Hänschen klein»). Струна Ля плюс открытая Ми.',
+  measures:[[['E5',1],['C#5',1],['C#5',2]],[['D5',1],['B4',1],['B4',2]],
+            [['A4',1],['B4',1],['C#5',1],['D5',1]],[['E5',1],['E5',1],['E5',2]],
+            [['E5',1],['C#5',1],['C#5',2]],[['D5',1],['B4',1],['B4',2]],
+            [['A4',1],['C#5',1],['E5',1],['E5',1]],[['C#5',4]],
+            [['B4',1],['B4',1],['B4',1],['B4',1]],[['B4',1],['C#5',1],['D5',2]],
+            [['C#5',1],['C#5',1],['C#5',1],['C#5',1]],[['C#5',1],['D5',1],['E5',2]],
+            [['E5',1],['C#5',1],['C#5',2]],[['D5',1],['B4',1],['B4',2]],
+            [['A4',1],['C#5',1],['E5',1],['E5',1]],[['A4',4]]]},
+ {id:'odeA', title:'Ода к радости (Ля и Ми)', hint:'Начинается со 2-го пальца на струне Ля. Струны Ля и Ми: ля — открытая, си — 1-й, до-диез — 2-й, ре — 3-й палец, ми — открытая Ми. Один раз низкая ми — 1-й палец на струне Ре.',
+  measures:[[['C#5',1],['C#5',1],['D5',1],['E5',1]],[['E5',1],['D5',1],['C#5',1],['B4',1]],
+            [['A4',1],['A4',1],['B4',1],['C#5',1]],[['C#5',1.5],['B4',0.5],['B4',2]],
+            [['C#5',1],['C#5',1],['D5',1],['E5',1]],[['E5',1],['D5',1],['C#5',1],['B4',1]],
+            [['A4',1],['A4',1],['B4',1],['C#5',1]],[['B4',1.5],['A4',0.5],['A4',2]],
+            [['B4',1],['B4',1],['C#5',1],['A4',1]],[['B4',1],['C#5',0.5],['D5',0.5],['C#5',1],['A4',1]],
+            [['B4',1],['C#5',0.5],['D5',0.5],['C#5',1],['B4',1]],[['A4',1],['B4',1],['E4',2]],
+            [['C#5',1],['C#5',1],['D5',1],['E5',1]],[['E5',1],['D5',1],['C#5',1],['B4',1]],
+            [['A4',1],['A4',1],['B4',1],['C#5',1]],[['B4',1.5],['A4',0.5],['A4',2]]]},
+ {id:'ode', title:'Ода к радости (Ре и Ля)', hint:'Струны Ре и Ля, первая позиция: ре — открытая, ми — 1-й, фа-диез — 2-й, соль — 3-й палец, ля — открытая Ля. Один раз низкая ля — 1-й палец на струне Соль.',
+  measures:[[['F#4',1],['F#4',1],['G4',1],['A4',1]],[['A4',1],['G4',1],['F#4',1],['E4',1]],
+            [['D4',1],['D4',1],['E4',1],['F#4',1]],[['F#4',1.5],['E4',0.5],['E4',2]],
+            [['F#4',1],['F#4',1],['G4',1],['A4',1]],[['A4',1],['G4',1],['F#4',1],['E4',1]],
+            [['D4',1],['D4',1],['E4',1],['F#4',1]],[['E4',1.5],['D4',0.5],['D4',2]],
+            [['E4',1],['E4',1],['F#4',1],['D4',1]],[['E4',1],['F#4',0.5],['G4',0.5],['F#4',1],['D4',1]],
+            [['E4',1],['F#4',0.5],['G4',0.5],['F#4',1],['E4',1]],[['D4',1],['E4',1],['A3',2]],
+            [['F#4',1],['F#4',1],['G4',1],['A4',1]],[['A4',1],['G4',1],['F#4',1],['E4',1]],
+            [['D4',1],['D4',1],['E4',1],['F#4',1]],[['E4',1.5],['D4',0.5],['D4',2]]]}
+];
+
+/* ---------- состояние ---------- */
+let melody=null;        // {notes:[...], measures:[[idx..]]}
+let idx=0;              // текущая нота
+let running=false, mode=null; // 'mic' | 'demo'
+let lastAccepted=-1, released=true, relCount=0;
+
+function loadMelody(m){
+  const notes=[], measures=[];
+  m.measures.forEach(mes=>{
+    const row=[];
+    mes.forEach(([n,d])=>{ row.push(notes.length); notes.push({...parseNote(n), dur:d, state:'', cents:null, miss:null, wrong:[]}); });
+    measures.push(row);
+  });
+  melody={def:m, notes, measures};
+  idx=0; lastAccepted=-1; released=true; relCount=0;
+  render(); updateTarget();
+}
+
+/* ---------- рисуем ноты ---------- */
+const GAP=12, TOP=20, STAFF=GAP*4, BELOW=36, NW=44, CLEF=40;
+let FING_Y=TOP+STAFF+30, ROW_H=TOP+STAFF+BELOW;   // меняются по строке
+const LINE_STEPS=[30,32,34,36,38];           // E4 G4 B4 D5 F5
+function yOf(step){ return TOP+STAFF-(step-30)*(GAP/2); }
+
+function render(){
+  const host=document.getElementById('sheet');
+  host.innerHTML='';
+  if(!melody) return;
+  const W=host.clientWidth||600;
+  const left=CLEF+16;
+  // ширина строки при заданной ширине ноты
+  const used=(sys,nw)=>left + sys.reduce((s,m)=>s+m.length,0)*nw + 14*(sys.length-1) + 7;
+
+  // раскладываем такты по строчкам
+  const systems=[]; let cur=[];
+  melody.measures.forEach(mes=>{
+    if(cur.length && used(cur.concat([mes]),NW)>W-8){ systems.push(cur); cur=[]; }
+    cur.push(mes);
+  });
+  if(cur.length) systems.push(cur);
+
+  systems.forEach(sys=>{
+    // растягиваем такты по ширине строки, как в настоящих нотах
+    const cnt=sys.reduce((s,m)=>s+m.length,0);
+    let nw=(W-8-left-14*(sys.length-1)-7)/cnt;
+    nw=Math.max(NW*0.8, Math.min(nw, NW*1.4));
+
+    const svgNS='http://www.w3.org/2000/svg';
+    const svg=document.createElementNS(svgNS,'svg');
+    // низкие ноты (ниже до первой октавы) — цифры пальцев опускаем под них, строка чуть выше
+    const low=Math.min(...sys.flat().map(ni=>melody.notes[ni].step));
+    const extra=Math.max(0, Math.round(yOf(low)+22-(TOP+STAFF+30)));
+    FING_Y=TOP+STAFF+30+extra;
+    const H=TOP+STAFF+BELOW+extra; ROW_H=H;
+    const VW=Math.max(W, used(sys,nw)+4);          // не влезло — строка уменьшается целиком, а не обрезается
+    svg.setAttribute('viewBox',`0 0 ${VW} ${H}`);
+    svg.setAttribute('width',W); svg.setAttribute('height',Math.round(H*W/VW));
+    const add=(tag,attrs,text)=>{const e=document.createElementNS(svgNS,tag);
+      for(const k in attrs) e.setAttribute(k,attrs[k]); if(text!=null) e.textContent=text; svg.appendChild(e); return e;};
+
+    // сначала стан и ключ, ноты поверх
+    const endX=left+cnt*nw+14*(sys.length-1)+7;
+    LINE_STEPS.forEach(s=>add('line',{x1:6,x2:endX,y1:yOf(s),y2:yOf(s),class:'staffline'}));
+    add('text',{x:10,y:yOf(32)+2,class:'clef'},'𝄞');
+
+    let x=left;
+    sys.forEach(mes=>{
+      mes.forEach((ni,k)=> drawNote(add,svg,svgNS,melody.notes[ni],ni,x+nw*(k+0.5),nw));
+      x+=mes.length*nw;
+      add('line',{x1:x+7,x2:x+7,y1:yOf(38),y2:yOf(30),class:'bar'});
+      x+=14;
+    });
+    host.appendChild(svg);
+  });
+  paint();
+}
+
+function drawNote(add,svg,ns,note,ni,x,nw){
+  const g=document.createElementNS(ns,'g');
+  g.setAttribute('data-i',ni);
+  svg.appendChild(g);
+  const put=(tag,attrs,text)=>{const e=document.createElementNS(ns,tag);
+    for(const k in attrs) e.setAttribute(k,attrs[k]); if(text!=null) e.textContent=text; g.appendChild(e); return e;};
+  const y=yOf(note.step);
+  const lw=Math.min(13,(nw||NW)*0.3);
+  const bw=(nw||NW)-6;
+  put('rect',{x:x-bw/2,y:3,width:bw,height:ROW_H-6,rx:8,class:'hl'});   // полоса под текущей нотой
+
+  // добавочные линейки
+  for(let s=40;s<=note.step;s+=2) put('line',{x1:x-lw,x2:x+lw,y1:yOf(s),y2:yOf(s),class:'ledger'});
+  for(let s=28;s>=note.step;s-=2) put('line',{x1:x-lw,x2:x+lw,y1:yOf(s),y2:yOf(s),class:'ledger'});
+
+  // стрелки «выше / ниже» справа от головки (у ноты с точкой — правее точки, у восьмой со штилем вверх — правее флажка);
+  // видны только на текущей ноте. Подложку кладём под ноту, чтобы она не стирала штиль и флажок
+  const ax=x+((note.dur===1.5||note.dur===3)? 21 : (note.dur<1 && note.step<34)? 23 : 16);
+  const arrows=[[1,'up'],[-1,'down']].map(([s,c])=>{
+    const ay= s>0? Math.max(y,26) : y;               // у самых высоких нот стрелка вверх не вылезает за край строки
+    return [c,`M${ax} ${ay+8*s}V${ay-21*s}M${ax-6} ${ay-14*s}L${ax} ${ay-21*s}L${ax+6} ${ay-14*s}`];
+  });
+  arrows.forEach(([c,d])=>put('path',{d,class:'arr halo '+c}));
+
+  if(note.sharp) put('text',{x:x-lw-11,y:y+6,class:'acc'},'♯');
+  put('ellipse',{cx:x,cy:y,rx:7,ry:5.2,class:'nh'+(note.dur>=2?' hollow':''),
+                 transform:`rotate(-18 ${x} ${y})`});
+  if(note.dur<4){
+    const up=note.step<34, sx=up?x+6.6:x-6.6, ye=up?y-GAP*3.2:y+GAP*3.2;
+    put('line',{x1:sx, x2:sx, y1:y, y2:ye, class:'stem'});
+    if(note.dur<1)                                   // восьмая — флажок
+      put('path',{d:up?`M${sx} ${ye} q2 7 9 11 q3 4 0 10`:`M${sx} ${ye} q2 -7 9 -11 q3 -4 0 -10`,
+                  class:'stem',fill:'none'});
+  }
+  if(note.dur===1.5||note.dur===3)                   // нота с точкой
+    put('circle',{cx:x+12,cy:(note.step%2===0)?y-GAP/2+1:y,r:2.2,class:'nh'});
+  const f=fingering(note.midi);
+  put('text',{x:x,y:FING_Y,class:'fing'}, f?f.short:'');
+  arrows.forEach(([c,d])=>put('path',{d,class:'arr '+c}));
+}
+
+function paint(){
+  document.querySelectorAll('#sheet g[data-i]').forEach(g=>{
+    const i=+g.dataset.i, n=melody.notes[i];
+    g.setAttribute('class', i===idx ? 'n-cur' : (n.state?'n-'+n.state:''));
+  });
+  paintArrow();
+  const cur=document.querySelector('#sheet g.n-cur');
+  if(cur){                                  // ноты едут сами: текущая строка вторая сверху, предыдущая видна
+    const box=document.getElementById('sheetCard'), row=cur.closest('svg');
+    const prev=row.previousElementSibling;
+    const top=box.scrollTop+row.getBoundingClientRect().top-box.getBoundingClientRect().top
+              -(prev?prev.getBoundingClientRect().height:0)-4;
+    box.scrollTo({top:Math.max(0,top),behavior:'smooth'});
+  }
+}
+
+/* ---------- определение высоты звука (MPM) ---------- */
+// уровни строгости: в пределах стольких центов нота считается чистой
+const LEVELS=[{id:'novice',title:'Новичок',cents:30},{id:'amateur',title:'Любитель',cents:20},{id:'pro',title:'Профи',cents:10}];
+let CLEAN=LEVELS[0].cents;   // меняется выбором уровня
+const MIN_F=175, MAX_F=2800, GATE=0.005, CLARITY=0.55;
+function detectPitch(buf,sr){
+  const n=buf.length;
+  let mean=0; for(let i=0;i<n;i++) mean+=buf[i]; mean/=n;
+  let rms=0; for(let i=0;i<n;i++){ buf[i]-=mean; rms+=buf[i]*buf[i]; }
+  rms=Math.sqrt(rms/n);
+  if(rms<GATE) return null;
+
+  const maxLag=Math.min(Math.floor(sr/MIN_F), n-64);
+  const minLag=Math.max(2,Math.floor(sr/MAX_F));
+  const nsdf=new Float32Array(maxLag+1);
+  for(let t=minLag;t<=maxLag;t++){
+    let ac=0,sq=0;
+    for(let i=0;i<n-t;i++){ const a=buf[i],b=buf[i+t]; ac+=a*b; sq+=a*a+b*b; }
+    nsdf[t]= sq>0 ? 2*ac/sq : 0;
+  }
+  let gmax=0;
+  for(let t=minLag;t<=maxLag;t++) if(nsdf[t]>gmax) gmax=nsdf[t];
+  if(gmax<CLARITY) return null;
+
+  // высота пика между отсчётами (парабола) — иначе узкий пик высокой ноты кажется ниже и берётся двойной период
+  const top=t=>{ const a=nsdf[t-1],b=nsdf[t],c=nsdf[t+1], q=a-2*b+c; return q<0? b-(a-c)*(a-c)/(8*q) : b; };
+  const thr=0.87*gmax;
+  let peak=-1;
+  for(let t=minLag+1;t<maxLag;t++){
+    if(nsdf[t]>nsdf[t-1] && nsdf[t]>=nsdf[t+1] && top(t)>=thr){ peak=t; break; }
+  }
+  if(peak<0) return null;
+
+  // у живой скрипки на низких нотах основной тон бывает слабым, и первым совпадением
+  // оказывается половина периода — нота на октаву выше. Если через двойной период звук
+  // повторяется заметно точнее, это и есть настоящая нота.
+  // энергия на частоте f (окно Ханна) — чтобы проверить, есть ли у звука нижняя нота на самом деле
+  const energy=f=>{ const w=2*Math.PI*f/sr, c=2*Math.cos(w); let s1=0,s2=0;
+    for(let i=0;i<n;i++){ const s0=buf[i]*(0.5-0.5*Math.cos(2*Math.PI*i/(n-1)))+c*s1-s2; s2=s1; s1=s0; }
+    return s1*s1+s2*s2-c*s1*s2; };
+  for(const k of [2,3]){                         // настоящая нота на октаву (или дуодециму) ниже?
+    const alt=k*peak;
+    if(alt+4>=maxLag || sr/alt<185) continue;
+    let ap=alt; for(let t=alt-3;t<=alt+3;t++) if(nsdf[t]>nsdf[ap]) ap=t;
+    if(top(ap)<top(peak)-0.05) continue;         // через k периодов звук повторяется заметно хуже — не она
+    // у низкой ноты со слабым основным тоном есть энергия на её «лишних» обертонах (для октавы — нечётных),
+    // которых у высокой ноты нет совсем. Порог по записям: низкие ≥ 0.02, высокие ≤ 0.005.
+    // Ошибки «слышу выше, чем есть» чаще всего у нот на струнах Соль и Ре (слышится ниже 700 Гц);
+    // выше дуодециму не проверяем, а октаву — строже (по записям: настоящие высокие ≤ 0.012,
+    // «слышится октавой выше» ≥ 0.047).
+    const y0=nsdf[peak-1],y1=nsdf[peak],y2=nsdf[peak+1];             // частота — уточнённая между отсчётами
+    const f=sr/(peak+Math.max(-1,Math.min(1,(y0-y2)/(2*(y0-2*y1+y2)||1e-9)))); if(k===3 && f>700) continue;
+    const lo=f/k; let own=0, shared=0;
+    for(let h=1;h<=4*k;h++){ if(h*lo>=sr/2) break; const e=energy(h*lo); if(h%k) own+=e; else shared+=e; }
+    if(own>(f>700? 0.03 : 0.008)*shared){ peak=ap; break; }
+  }
+
+  const y0=nsdf[peak-1],y1=nsdf[peak],y2=nsdf[peak+1];
+  const d=(y0-y2)/(2*(y0-2*y1+y2)||1e-9);
+  const freq=sr/(peak+Math.max(-1,Math.min(1,d)));
+  if(!isFinite(freq)||freq<MIN_F||freq>MAX_F) return null;
+  return {freq, clarity:gmax, rms};
+}
+
+/* ---------- аудио ---------- */
+let ctx=null, analyser=null, micStream=null, micSrc=null, buf=null, raf=null;
+async function ensureCtx(){
+  if(!ctx){
+    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=ctx.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=0;
+    buf=new Float32Array(analyser.fftSize);
+  }
+  if(ctx.state==='suspended') await ctx.resume();
+}
+
+/* ---------- цикл слушания ---------- */
+let stable=[], lastHeard=null;
+function loop(){
+  raf=requestAnimationFrame(loop);
+  if(!running) return;
+  analyser.getFloatTimeDomainData(buf);
+  const p=detectPitch(buf,ctx.sampleRate);
+  if(mode==='tune'){ tuneFrame(p); return; }
+  if(mode==='tempo'){ tempoFrame(p); return; }
+  const target=melody.notes[idx];
+
+  if(!p){
+    stable.length=0; if(++relCount>=3) released=true;   // ноту отпустили, если тишина дольше ~50 мс
+    showHeard(null,target);
+    return;
+  }
+  const midiF=69+12*Math.log2(p.freq/440);
+  const midi=Math.round(midiF);
+  const cents=Math.round((midiF-midi)*100);
+  showHeard({midi,cents,freq:p.freq},target);
+  if(mode==='demo') return;                       // демо просто играет — ничего не оцениваем
+
+  if(stable.length && stable[0].midi!==midi) stable.length=0;
+  stable.push({midi,cents});
+  if(stable.length>24) stable.shift();
+
+  // ноту отпустили, если ~50 мс звучит другая нота; один ошибочный кадр — не в счёт
+  if(midi===lastAccepted) relCount=0; else if(++relCount>=3) released=true;
+  if(stable.length<5 || !released) return;
+
+  const last=stable.slice(-6);
+  const avg=Math.round(last.reduce((s,v)=>s+v.cents,0)/last.length);
+  if(midi===target.midi){
+    if(last.some(v=>Math.abs(v.cents)>CLEAN)){     // нота та, но не чисто — ждём, пока поправит
+      // первые ~0.15 с — атака смычка, высота у живой скрипки там всегда чуть гуляет: ошибкой не считаем
+      if(stable.length<10) return;
+      if(target.miss==null) target.miss=avg;
+      setStatus(avg>0 ? `Высоковато (+${avg}). Подправь и держи звук.`
+                      : `Низковато (${avg}). Подправь и держи звук.`);
+      return;
+    }
+    target.cents=avg;
+    target.state = (target.miss==null && target.wrong.length===0) ? 'ok'
+                 : (target.wrong.length<=1) ? 'mid' : 'bad';
+    lastAccepted=midi; released=false; relCount=0; stable.length=0;
+    advance();
+  } else if(stable.length>=8){
+    if(!target.wrong.includes(midi)) target.wrong.push(midi);
+    const nm=midiToName(midi);
+    setStatus((midi-target.midi)%12===0
+      ? `Слышу «${nm.ru}» на октаву ${midi>target.midi?'выше':'ниже'} — нужна «${target.ru}» ${midi>target.midi?'ниже':'выше'}. Поправь и держи звук.`
+      : `Слышу «${nm.ru}» — нужна «${target.ru}». Поправь и держи звук.`);
+  }
+}
+
+function flashOk(text){
+  const el=document.getElementById('okFlash');
+  document.getElementById('okNext').textContent=text;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+
+function advance(){
+  const accepted=melody.notes[idx].state!=='skip';
+  idx++;
+  if(accepted) flashOk(idx<melody.notes.length ? '· дальше: '+melody.notes[idx].ru : '· готово!');
+  if(idx>=melody.notes.length){ finish(); return; }
+  setStatus('');
+  paint(); updateTarget();
+}
+
+/* ---------- режим «в темпе»: ноты идут сами, каждая окрашивается по тому, как прозвучала ----------
+   Ритм (когда именно начата нота) не оценивается — только высота того, что звучало в её время. */
+const COUNT_IN=4;                        // щелчков перед началом
+const LAT=0.04;                          // звук в буфере анализатора отстаёт от часов примерно на столько, с
+let tempo={on:false, bpm:60, click:true};
+let tl=null, metroBus=null, clickBuf=null;
+
+function tick(t,loud){                   // щелчок метронома — короткий шум, разбор высоты его не слышит как ноту
+  if(!clickBuf){
+    const sr=ctx.sampleRate, n=Math.round(sr*0.03); clickBuf=ctx.createBuffer(1,n,sr);
+    const d=clickBuf.getChannelData(0); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(sr*0.004));
+  }
+  const s=ctx.createBufferSource(), g=ctx.createGain();
+  s.buffer=clickBuf; g.gain.value=loud? 0.9 : 0.45;
+  s.connect(g); g.connect(metroBus); s.start(t);
+}
+function tempoStart(){
+  const spb=60/tempo.bpm, t0=ctx.currentTime+0.2+COUNT_IN*spb;
+  const starts=[], ends=[]; let t=t0;
+  melody.notes.forEach(n=>{ starts.push(t); t+=n.dur*spb; ends.push(t); });
+  tl={spb, t0, starts, ends, frames:melody.notes.map(()=>[]), judged:-1, count:0};
+  metroBus=ctx.createGain(); metroBus.connect(ctx.destination);
+  for(let k=0;k<COUNT_IN;k++) tick(t0-(COUNT_IN-k)*spb, k===0);
+  if(tempo.click) for(let b=0; t0+b*spb<t-1e-6; b++) tick(t0+b*spb, b%4===0);
+}
+function countPill(text){
+  const el=document.getElementById('countPill'); el.textContent=text;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+function tempoFrame(p){
+  const notes=melody.notes, L=notes.length, now=ctx.currentTime;
+  const mf=p? 69+12*Math.log2(p.freq/440) : null;
+  if(now<tl.t0){                                       // счёт перед началом
+    const b=Math.floor((now-(tl.t0-COUNT_IN*tl.spb))/tl.spb)+1;
+    if(b>=1 && b!==tl.count){ tl.count=b; countPill('Приготовься · '+b); }
+  } else {
+    if(tl.count!=='go'){ tl.count='go'; countPill('Играй!'); setStatus('Играй вместе со щелчками. Ноты не ждут — ошибся, всё равно иди дальше.'); }
+    const ta=now-LAT;
+    // кадр — в ту ноту, чьё время сейчас; начало ноты (атака, переход с прошлой) не учитываем
+    for(let k=tl.judged+1; k<L && tl.starts[k]<=ta; k++){
+      if(ta<tl.ends[k]){ if(ta>=tl.starts[k]+Math.min(0.15,0.35*(tl.ends[k]-tl.starts[k]))) tl.frames[k].push(mf); break; }
+    }
+    while(tl.judged+1<L && ta>=tl.ends[tl.judged+1]) judgeNote(++tl.judged);
+    if(tl.judged>=L-1){ finishTempo(); return; }
+    let i=idx; while(i<L-1 && now>=tl.ends[i]) i++;
+    if(i!==idx){ idx=i; paint(); updateTarget(); }
+  }
+  showHeard(p? {midi:Math.round(mf), freq:p.freq} : null, notes[idx]);
+}
+function judgeNote(k){
+  // высота ноты — середина (медиана) того, что звучало в её время; чисто — по выбранному уровню
+  const n=melody.notes[k], fr=tl.frames[k];
+  const v=fr.filter(m=>m!=null).map(m=>(m-n.midi)*100).sort((a,b)=>a-b);
+  if(v.length<3 || v.length<0.3*fr.length){ n.state='miss'; n.cents=null; }
+  else { const med=v[v.length>>1]; n.cents=Math.round(med); n.state=Math.abs(med)<=CLEAN? 'ok' : med>0? 'hi' : 'lo'; }
+  paint();
+}
+function finishTempo(){
+  idx=melody.notes.length; stop();
+  setStatus('Готово! Зелёные ноты — чисто, красные — высоко, фиолетовые — низко, серые — не услышал.');
+}
+
+/* ---------- гриф ---------- */
+const FB={top:40, len:244, x:[18,38,58,78], maxD:8};      // струны слева направо: Соль Ре Ля Ми
+function fbY(d){ return FB.top+FB.len*(1-Math.pow(2,-d/12))/(1-Math.pow(2,-FB.maxD/12)); }
+function placeOf(midi){                                     // на какой струне и сколько полутонов от порожка
+  let best=null;
+  STRINGS.forEach((s,i)=>{const d=midi-s.m; if(d>=0&&d<=7) best={i,d};});
+  return best;
+}
+function drawBoard(target, midiF){
+  const svg=document.getElementById('board'), tip=document.getElementById('fbTip');
+  if(!svg) return;
+  const ns='http://www.w3.org/2000/svg';
+  let out='';
+  const el=(tag,a,t='')=>{out+='<'+tag; for(const k in a) out+=` ${k}="${a[k]}"`; out+='>'+t+'</'+tag+'>';};
+  el('rect',{x:6,y:FB.top,width:84,height:FB.len+14,rx:4,class:'fb-wood'});
+  el('rect',{x:4,y:FB.top-4,width:88,height:5,rx:1.5,class:'fb-nut'});
+  // открытые струны — в два ряда, чтобы слова не слипались
+  ['соль','ре','ля','ми'].forEach((n,i)=>el('text',{x:FB.x[i],y:FB.top-(i%2? 14 : 27),class:'fb-lab'},n));
+  [2,4,5].forEach(d=>el('line',{x1:8,x2:88,y1:fbY(d),y2:fbY(d),class:'fb-tape'}));   // где обычно клеят полоски
+  FB.x.forEach(x=>el('line',{x1:x,x2:x,y1:FB.top,y2:FB.top+FB.len+14,class:'fb-str'}));
+  tip.textContent=''; tip.className='fbtip';
+  const p=target && placeOf(target.midi);
+  if(p){
+    const x=FB.x[p.i], ty=fbY(p.d);
+    if(p.d===0) el('circle',{cx:x,cy:FB.top-2,r:7,class:'fb-open'});
+    else { el('circle',{cx:x,cy:ty,r:8,class:'fb-want'});
+           el('text',{x:x,y:ty+3.5,class:'fb-want-t'},FING[p.d].charAt(0)); }
+    if(midiF!=null){
+      const diff=(midiF-target.midi)*100;
+      if(Math.abs(diff)<=CLEAN){ tip.textContent='✓ на месте'; tip.className='fbtip ok'; }
+      else if(Math.abs(diff)<=150){
+        if(p.d===0){ tip.textContent=diff<0?'струна звучит низко':'струна звучит высоко'; tip.className='fbtip move'; }
+        else {
+          const hy=fbY(Math.max(0,Math.min(FB.maxD,p.d+diff/100)));
+          el('circle',{cx:x,cy:hy,r:4.5,class:'fb-heard'});
+          // стрелка от того места, где палец сейчас, к нужному
+          const dir=diff<0?1:-1, y0=hy, y1=(Math.abs(ty-hy)<16)? hy+dir*16 : ty-dir*9;
+          const ax=x+(p.i<3?11:-11);
+          el('line',{x1:ax,x2:ax,y1:y0,y2:y1,class:'fb-arrow'});
+          el('path',{d:`M${ax-5} ${y1-dir*6} L${ax} ${y1} L${ax+5} ${y1-dir*6} Z`,class:'fb-head'});
+          tip.textContent=diff<0?'↓ палец к подставке':'↑ палец к завитку'; tip.className='fbtip move';
+        }
+      }
+    }
+  }
+  svg.innerHTML=out;
+}
+
+/* ---------- стрелка на самой ноте: играешь выше нужной — вверх, ниже — вниз ---------- */
+let noteDir=0, dirWant=0, dirRun=0, arrowIdx=-1;
+function noteArrow(target, midiF){
+  let d=0;
+  if(midiF!=null && target && (mode==='mic' || mode==='tempo')){   // в демо и тюнере — не показываем
+    const diff=(midiF-target.midi)*100;
+    if(Math.abs(diff)>CLEAN) d= diff>0? 1 : -1;               // чисто — по выбранному уровню
+  }
+  if(arrowIdx!==idx){ arrowIdx=idx; noteDir=0; dirWant=d; dirRun=0; }
+  if(d===dirWant) dirRun++; else { dirWant=d; dirRun=1; }
+  // появляется через ~0.15 с одного и того же (атака смычка и переход с прошлой ноты — не в счёт), гаснет через ~50 мс
+  if(d!==noteDir && (dirRun>=(d? 10 : 3) || !running)){ noteDir=d; paintArrow(); }
+}
+function paintArrow(){
+  const g=document.querySelector('#sheet g.n-cur'); if(!g) return;
+  const d= arrowIdx===idx? noteDir : 0;
+  g.classList.toggle('n-up', d>0); g.classList.toggle('n-down', d<0);
+}
+
+function showHeard(h,target){
+  // только что засчитанную ноту ещё держат — стрелку к следующей пока не показываем
+  const mf= h && !(h.midi===lastAccepted && !released)? 69+12*Math.log2(h.freq/440) : null;
+  drawBoard(target, mf); noteArrow(target, mf);
+  const hn=document.getElementById('heardNote'), hi=document.getElementById('heardInfo');
+  const nd=document.getElementById('needle');
+  const ph=document.getElementById('playHz');
+  if(!h){ hn.textContent='·'; hi.textContent='тишина'; ph.textContent='—'; nd.classList.remove('live'); nd.style.top='50%'; return; }
+  const nm=midiToName(h.midi);
+  hn.textContent=nm.ru;
+  hi.textContent=nm.lat;
+  ph.textContent=h.freq.toFixed(1)+' Гц';
+  nd.classList.add('live');
+  // стрелка относительно нужной ноты
+  const diff=(69+12*Math.log2(h.freq/440)-target.midi)*100;
+  const c=Math.max(-50,Math.min(50,diff));
+  nd.style.top=(50-c)+'%';
+}
+
+function updateTarget(){
+  const t=melody.notes[idx];
+  const f=fingering(t.midi);
+  document.getElementById('targetNote').innerHTML=
+    t.ru+'<small>'+(f?f.text:'')+' · нота '+(idx+1)+' из '+melody.notes.length+'</small>';
+  document.getElementById('wantNote').textContent=t.ru;
+  drawBoard(t,null);
+  document.getElementById('needHz').textContent=(440*Math.pow(2,(t.midi-69)/12)).toFixed(1)+' Гц';
+}
+
+function setStatus(s){ document.getElementById('status').textContent=s; }
+
+/* ---------- конец ---------- */
+function finish(){
+  stop();
+  setStatus('Готово! Мелодия сыграна до конца.');
+}
+
+/* ---------- запуск / стоп ---------- */
+async function openMic(){
+  try{
+    await ensureCtx();
+    micStream=await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    micSrc=ctx.createMediaStreamSource(micStream);
+    micSrc.connect(analyser);
+    return null;
+  }catch(e){ return 'Не получилось включить микрофон: '+e.message; }
+}
+async function start(){
+  if(!melody) return;
+  const err=await openMic(); if(err){ setStatus(err); return; }
+  document.getElementById('btnStart').textContent='Стоп';
+  if(tempo.on){                                     // в темпе — всегда с начала, после счёта
+    reset(); mode='tempo'; running=true; tempoStart();
+    setStatus(`Слушай счёт: ${COUNT_IN} щелчка — и начинай с первой ноты.`);
+  } else {
+    if(idx>=melody.notes.length) reset();          // мелодия уже сыграна до конца — начинаем сначала
+    mode='mic'; running=true;
+    document.getElementById('btnSkip').disabled=false;
+    setStatus('Слушаю. Играй первую ноту.');
+  }
+  document.querySelector('.btns').scrollIntoView({block:'start',behavior:'smooth'});   // кнопки вверху экрана, ноты под ними
+  paint(); updateTarget();
+  if(!raf) loop();
+}
+
+function stop(){
+  running=false; mode=null; tl=null;
+  if(metroBus){ try{metroBus.disconnect();}catch(e){} metroBus=null; }
+  if(micSrc){ try{micSrc.disconnect();}catch(e){} micSrc=null; }
+  if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
+  stopDemo();
+  document.getElementById('btnStart').textContent='Начать';
+  document.getElementById('tListen').textContent='Слушать';
+  document.getElementById('btnDemo').textContent='Демо (без скрипки)';
+  document.getElementById('btnSkip').disabled=true;
+  showHeard(null,melody?melody.notes[Math.min(idx,melody.notes.length-1)]:{midi:69});
+  paint();
+}
+
+/* ---------- демо: живая скрипка из библиотеки violin/ в тот же анализатор ----------
+   violin/long/ — долгие ноты без вибрато (Университет Айовы, mf), violin/short/ — короткие (spiccato, ldk1609, CC0).
+   Файлы читаются с локального сервера (Запустить.command); с file:// браузер их не отдаёт. */
+const BEAT=0.5;                          // четверть в демо, секунд (в режиме «в темпе» — по выбранному темпу)
+const demoBeat=()=> tempo.on? 60/tempo.bpm : BEAT;
+const SHORT_MAX=0.3;                     // ноты короче — из short/
+let demoTimer=null, demoSrc=null, demoGain=null, demoMidi=null;
+const noteCache={};
+function stopDemo(){
+  if(demoTimer){clearTimeout(demoTimer);demoTimer=null;}
+  if(demoSrc){ try{demoSrc.stop()}catch(e){} demoSrc=null; }
+  demoMidi=null;
+}
+async function loadNote(dir, midi){
+  const key=dir+'/'+midi;
+  if(noteCache[key]) return noteCache[key];
+  const name=midiToName(midi).lat;
+  // в копии в интернете у файлов нет «#» в имени (адрес его не допускает): A#4 → As4
+  let data=null;
+  for(const n of name.includes('#')? [name, name.replace('#','s')] : [name]){
+    const r=await fetch('violin/'+dir+'/'+encodeURIComponent(n)+'.wav',{cache:'no-cache'}).catch(()=>null);   // после пересборки библиотеки — свежие файлы
+    if(r && r.ok && !/html/.test(r.headers.get('content-type')||'')){ data=await r.arrayBuffer(); break; }
+  }
+  if(!data) throw new Error('нет файла '+dir+'/'+name);
+  const buf=await ctx.decodeAudioData(data), d=buf.getChannelData(0), sr=buf.sampleRate;
+  // кривая высоты записи каждые 20 мс — тем же разбором, что слушает игрока; демо по ней выравнивает ноту
+  const STEP=0.02, want=440*Math.pow(2,(midi-69)/12), raw=[]; let start=-1;
+  for(let p=0; p+2048<d.length; p+=Math.round(sr*STEP)){
+    const q=detectPitch(Float32Array.from(d.subarray(p,p+2048)),sr);
+    let c=q? 1200*Math.log2(q.freq/want) : null;
+    if(c!=null){ c-=1200*Math.round(c/1200); if(Math.abs(c)>80) c=null; }   // скачки замера на октаву и выбросы — мимо
+    if(c!=null && start<0) start=p/sr;
+    raw.push(c);
+  }
+  const ok=raw.filter(c=>c!=null).sort((a,b)=>a-b), med=ok.length? ok[ok.length>>1] : 0;
+  // сглаживаем медианой по 5 точкам, пропуски заполняем соседними
+  const cur=raw.map((c,i)=>{ const w=raw.slice(Math.max(0,i-2),i+3).filter(v=>v!=null).sort((a,b)=>a-b); return w.length? w[w.length>>1] : med; });
+  return noteCache[key]={buf, start: dir==='short'? 0 : Math.max(0,start-0.02), step:STEP, cents:cur, f: want*Math.pow(2,med/1200)};
+}
+async function runDemo(){
+  if(!melody) return;
+  await ensureCtx();
+  stop();
+  reset();
+  setStatus('Готовлю звук скрипки…');
+  try{
+    for(const n of melody.notes){ await loadNote('long',n.midi); if(n.dur*demoBeat()<=SHORT_MAX) await loadNote('short',n.midi); }
+  }catch(e){
+    setStatus('Демо с живой скрипкой работает, только если открыть приложение через «Запустить.command». ('+e.message+')');
+    return;
+  }
+  mode='demo'; running=true;
+  document.getElementById('btnDemo').textContent='Остановить демо';
+  document.getElementById('btnStart').textContent='Стоп';
+  setStatus('Демо: живая скрипка играет мелодию. Слушай и смотри, какие ноты и какие пальцы.');
+  idx=0; paint(); updateTarget();
+  if(!raf) loop();
+
+  // мелодия звучит подряд, в темпе: каждая нота — своей длительности, без проверок и остановок
+  const playNote=async(i)=>{
+    if(!running||mode!=='demo') return;
+    if(i>=melody.notes.length){            // последняя нота досказывает своё (затухание уже назначено), потом конец
+      demoTimer=setTimeout(()=>{ stop(); idx=0; paint(); updateTarget(); setStatus('Демо закончилось. Нажми «Начать» и сыграй сам.'); },450);
+      return; }
+    idx=i; paint(); updateTarget();
+    const target=melody.notes[i], secs=target.dur*demoBeat();
+    const dir=secs<=SHORT_MAX? 'short' : 'long';
+    const s=await loadNote(dir,target.midi);
+    if(!running||mode!=='demo') return;
+    const want=440*Math.pow(2,(target.midi-69)/12);
+    const rateAt=bt=>{ const k=Math.min(s.cents.length-1, Math.max(0, Math.round(bt/s.step))); return Math.pow(2,-s.cents[k]/1200); };
+    const whole=(s.buf.duration-s.start)*s.f/want;                       // сколько звучит запись целиком
+    // долгая нота звучит свою длительность; короткая — свой удар, следующая нота её глушит
+    const hold=dir==='short'? Math.min(whole, secs+0.1) : Math.min(whole, secs);
+    // предыдущая нота гаснет (смена смычка); у повтора той же ноты — короткий разрыв, как у живого скрипача
+    const repeat=(demoMidi===target.midi), now=ctx.currentTime;
+    if(demoSrc){ demoGain.gain.cancelScheduledValues(now); demoGain.gain.setTargetAtTime(0,now,0.01); try{demoSrc.stop(now+0.08)}catch(e){} }
+    demoMidi=target.midi;
+    const src=ctx.createBufferSource(), g=ctx.createGain(), t=now+(repeat?0.06:0.01);
+    src.buffer=s.buf;
+    // по ходу ноты выравниваем высоту записи (каждые 20 мс) — демо звучит точно в ноту
+    for(let k=0; k*s.step<=hold+0.3; k++){ const r=rateAt(s.start+k*s.step); if(k===0) src.playbackRate.setValueAtTime(r,t); else src.playbackRate.linearRampToValueAtTime(r,t+k*s.step); }
+    g.gain.setValueAtTime(1,t);
+    if(hold<whole-0.05){ g.gain.setValueAtTime(1,t+hold); g.gain.setTargetAtTime(0,t+hold,0.035); }   // снятие смычка
+    src.connect(g); g.connect(analyser); g.connect(ctx.destination);
+    src.start(t,s.start); src.stop(t+Math.min(whole,hold+0.25));
+    demoSrc=src; demoGain=g;
+    demoTimer=setTimeout(()=>playNote(i+1), secs*1000);
+  };
+  playNote(0);
+}
+
+/* ---------- настройка скрипки ---------- */
+const TSTR=[{n:'соль',m:55},{n:'ре',m:62},{n:'ля',m:69},{n:'ми',m:76}];
+const TUNE_OK=5;                       // в пределах стольких центов струна считается настроенной (как у обычных тюнеров)
+let tuneSel=null, tuneIdx=-1, tuneHold=0, tuneOk=[false,false,false,false];
+function renderTuner(){
+  const box=document.getElementById('tStrings'); box.innerHTML='';
+  TSTR.forEach((t,i)=>{
+    const b=document.createElement('button');
+    b.className='tchip'+(i===tuneIdx?' on':'')+(i===tuneSel?' sel':'')+(tuneOk[i]?' ok':'');
+    b.innerHTML=`<b>${t.n}</b><small>${(440*Math.pow(2,(t.m-69)/12)).toFixed(1)} Гц</small>`;
+    b.onclick=()=>{ tuneSel=(tuneSel===i? null : i); tuneIdx=i; tuneHold=0; renderTuner(); };
+    box.appendChild(b);
+  });
+}
+function tuneTip(text,cls){ const el=document.getElementById('tTip'); el.textContent=text; el.className='ttip'+(cls?' '+cls:''); }
+function tuneFrame(p){
+  const nd=document.getElementById('tNeedle');
+  if(!p){ nd.classList.remove('live','ok'); tuneHold=0; return; }
+  const midiF=69+12*Math.log2(p.freq/440);
+  // какая струна: ближайшая по ноте в октаве (так не мешают ошибки разбора на октаву); или выбранная нажатием
+  const fold=d=>d-12*Math.round(d/12);
+  let i=tuneSel;
+  if(i==null){ let best=99; TSTR.forEach((t,k)=>{ const d=Math.abs(fold(midiF-t.m)); if(d<best){best=d;i=k;} });
+    if(best>2.5){ nd.classList.remove('live','ok'); tuneTip('Это не открытая струна. Проведи смычком по струне без пальцев.'); return; } }
+  if(i!==tuneIdx){ tuneIdx=i; tuneHold=0; renderTuner(); }
+  const t=TSTR[i], c=Math.round(fold(midiF-t.m)*100), want=440*Math.pow(2,(t.m-69)/12);
+  document.getElementById('tNote').textContent=t.n;
+  document.getElementById('tHz').textContent=`играешь ${(want*Math.pow(2,c/1200)).toFixed(1)} Гц · нужно ${want.toFixed(1)} Гц · ${c>0?'+':''}${c} ц`;
+  nd.classList.add('live'); nd.style.left=(50+Math.max(-50,Math.min(50,c)))+'%';
+  nd.classList.toggle('ok',Math.abs(c)<=TUNE_OK);
+  if(Math.abs(c)<=TUNE_OK){
+    if(++tuneHold>=45 && !tuneOk[i]){ tuneOk[i]=true; renderTuner(); }
+    tuneTip(tuneOk.every(Boolean)? '✓ Все четыре струны настроены — можно играть!' :
+            tuneOk[i]? `✓ Струна «${t.n}» настроена. Теперь следующая.` : `Чисто — подержи звук секунду…`, 'ok');
+  } else {
+    tuneHold=0;
+    tuneTip(c<0? `Низковато (${c} ц) — подтяни струну: машинку у подставки — по часовой стрелке, понемногу.`
+               : `Высоковато (+${c} ц) — ослабь струну: машинку у подставки — против часовой стрелки, понемногу.`, 'move');
+  }
+}
+async function tuneListen(){
+  if(running && mode==='tune'){ stop(); return; }
+  stop();
+  const err=await openMic(); if(err){ tuneTip(err); return; }
+  mode='tune'; running=true; tuneHold=0;
+  document.getElementById('tListen').textContent='Стоп';
+  tuneTip('Слушаю. Проведи смычком по открытой струне.');
+  if(!raf) loop();
+}
+async function tunePlay(){            // открытая струна настоящей скрипкой (violin/long), точно в ноту
+  await ensureCtx();
+  const t=TSTR[tuneSel ?? (tuneIdx>=0? tuneIdx : 2)];
+  let s; try{ s=await loadNote('long',t.m); }catch(e){ tuneTip('Звук струны есть, только если открыть приложение через «Запустить.command».'); return; }
+  const want=440*Math.pow(2,(t.m-69)/12), whole=(s.buf.duration-s.start)*s.f/want, hold=Math.min(whole,2.5);
+  const src=ctx.createBufferSource(), g=ctx.createGain(), t0=ctx.currentTime+0.02;
+  src.buffer=s.buf;
+  for(let k=0;k*s.step<=hold+0.3;k++){ const kk=Math.min(s.cents.length-1,Math.round((s.start+k*s.step)/s.step)), r=Math.pow(2,-s.cents[kk]/1200);
+    if(k===0) src.playbackRate.setValueAtTime(r,t0); else src.playbackRate.linearRampToValueAtTime(r,t0+k*s.step); }
+  g.gain.setValueAtTime(1,t0); if(hold<whole-0.05){ g.gain.setValueAtTime(1,t0+hold); g.gain.setTargetAtTime(0,t0+hold,0.05); }
+  src.connect(g); g.connect(ctx.destination);           // в динамик, не в разбор
+  src.start(t0,s.start); src.stop(t0+Math.min(whole,hold+0.4));
+}
+function openTuner(){
+  stop(); document.body.classList.add('tuning');
+  tuneOk=[false,false,false,false]; tuneSel=null; tuneIdx=-1; tuneHold=0;   // струны могли расстроиться — проверяем заново
+  document.getElementById('tuner').hidden=false;
+  renderTuner(); tuneTip('');
+  document.querySelector('.btns').scrollIntoView({block:'start',behavior:'smooth'});
+}
+function closeTuner(){
+  if(mode==='tune') stop();
+  document.body.classList.remove('tuning');
+  document.getElementById('tuner').hidden=true;
+}
+document.getElementById('btnTune').onclick=()=>{ document.getElementById('tuner').hidden? openTuner() : closeTuner(); };
+document.getElementById('tListen').onclick=tuneListen;
+document.getElementById('tPlay').onclick=tunePlay;
+document.getElementById('tDone').onclick=closeTuner;
+
+/* ---------- кнопки ---------- */
+function reset(){
+  if(!melody) return;
+  melody.notes.forEach(n=>{n.state='';n.cents=null;n.miss=null;n.wrong=[];});
+  idx=0; lastAccepted=-1; released=true; relCount=0; stable.length=0;
+  setStatus(''); paint(); updateTarget();
+}
+
+document.getElementById('btnStart').onclick=()=>{ closeTuner(); running?stop():start(); };
+document.getElementById('btnReset').onclick=()=>{ closeTuner(); stop(); reset(); };
+document.getElementById('btnDemo').onclick=()=>{ closeTuner(); mode==='demo' ? stop() : runDemo(); };
+document.getElementById('btnSkip').onclick=()=>{
+  if(!melody||!running) return;
+  melody.notes[idx].state='skip'; advance();
+};
+
+const melodySel=document.getElementById('melodySel');
+MELODIES.forEach((m,i)=>melodySel.add(new Option(m.title,i)));
+melodySel.onchange=()=>{ stop(); loadMelody(MELODIES[+melodySel.value]); };
+
+// уровень: выбор запоминается в этом браузере
+const levelSel=document.getElementById('levelSel');
+function setLevel(id){
+  const lv=LEVELS.find(l=>l.id===id)||LEVELS[0];
+  CLEAN=lv.cents;
+  levelSel.value=lv.id;
+  const nd=document.querySelector('.needle');
+  nd.style.setProperty('--c', CLEAN+'%'); nd.style.setProperty('--w', Math.min(48,CLEAN+15)+'%');
+  try{ localStorage.setItem('skripka-level', lv.id); }catch(e){}
+}
+LEVELS.forEach(l=>levelSel.add(new Option(`${l.title} ±${l.cents} ц`, l.id)));
+levelSel.onchange=()=>setLevel(levelSel.value);
+let savedLevel=null; try{ savedLevel=localStorage.getItem('skripka-level'); }catch(e){}
+setLevel(savedLevel);
+
+// режим: ждать каждую ноту или играть в темпе; выбор и темп запоминаются в этом браузере
+const modeSel=document.getElementById('modeSel'), bpmIn=document.getElementById('bpm'), metroIn=document.getElementById('metro');
+function saveTempo(){ try{ localStorage.setItem('skripka-tempo', JSON.stringify(tempo)); }catch(e){} }
+function showMode(){
+  modeSel.value=tempo.on?'tempo':'wait';
+  document.getElementById('tempoBox').hidden=!tempo.on;
+  bpmIn.value=tempo.bpm; metroIn.checked=tempo.click;
+}
+function setBpm(v){
+  tempo.bpm=Math.max(30, Math.min(160, Math.round(+v) || 60));
+  if(running && mode!=='tune') stop();
+  showMode(); saveTempo();
+}
+modeSel.onchange=()=>{
+  const on=modeSel.value==='tempo'; if(on===tempo.on) return;
+  closeTuner(); stop(); reset(); tempo.on=on; showMode(); saveTempo();
+};
+document.getElementById('bpmMinus').onclick=()=>setBpm(tempo.bpm-5);
+document.getElementById('bpmPlus').onclick=()=>setBpm(tempo.bpm+5);
+bpmIn.onchange=()=>setBpm(bpmIn.value);
+metroIn.onchange=()=>{ tempo.click=metroIn.checked; if(mode==='tempo') stop(); saveTempo(); };
+try{ Object.assign(tempo, JSON.parse(localStorage.getItem('skripka-tempo'))||{}); }catch(e){}
+showMode();
+
+let rt=null;
+addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(render,150); });
+
+melodySel.value=0; loadMelody(MELODIES[0]);
+if(location.search.includes('demo=1')) setTimeout(runDemo,300);
+</script>
+<div class="okflash" id="okFlash" aria-live="polite"><b>✓</b>Верно<span id="okNext"></span></div>
+<div class="okflash count" id="countPill" aria-live="polite"></div>
+</body>
+</html>
