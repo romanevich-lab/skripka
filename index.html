@@ -106,9 +106,16 @@
   .tchip small{color:var(--muted);font-size:12px}
   .tchip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
   .tchip.sel{box-shadow:inset 0 0 0 2px var(--accent)}
-  .tchip.ok{border-color:var(--ok)}
-  .tchip.ok b::after{content:' ✓';color:var(--ok)}
-  .tnow{display:flex;align-items:baseline;gap:12px;margin:16px 0 0;flex-wrap:wrap}
+  .tchip.ok{border-color:var(--ok);background:var(--ok);color:#fff}
+  .tchip.ok small{color:#fff;opacity:.85}
+  .tchip.ok b::after{content:' ✓'}
+  .tpanel{position:relative;margin-top:16px}
+  .tokbox{position:absolute;inset:-8px;border-radius:12px;background:var(--ok);color:#fff;display:flex;flex-direction:column;
+          align-items:center;justify-content:center;text-align:center;opacity:0;pointer-events:none;transition:opacity .15s}
+  .tokbox b{font-size:34px;line-height:1.1}
+  .tokbox span{font-size:17px;font-weight:600}
+  .tpanel.done .tokbox{opacity:1}
+  .tnow{display:flex;align-items:baseline;gap:12px;margin:0;flex-wrap:wrap}
   .tnow .tbig{font-size:40px;font-weight:700;line-height:1}
   .tnow span{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
   .tmeter{position:relative;height:40px;margin-top:10px;border-radius:8px;overflow:hidden;
@@ -177,9 +184,12 @@
   <div class="card tuner" id="tuner" hidden>
     <div class="thead"><b>Настройка скрипки</b><span>Нажми «Слушать» и проведи смычком по открытой струне — ровно и долго.</span></div>
     <div class="tstrings" id="tStrings"></div>
-    <div class="tnow"><span class="tbig" id="tNote">—</span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
-    <div class="tmeter"><u></u><i id="tNeedle"></i></div>
-    <div class="tlab"><span>ниже</span><span>чисто</span><span>выше</span></div>
+    <div class="tpanel" id="tPanel">
+      <div class="tnow"><span class="tbig" id="tNote">—</span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
+      <div class="tmeter"><u></u><i id="tNeedle"></i></div>
+      <div class="tlab"><span>ниже</span><span>чисто</span><span>выше</span></div>
+      <div class="tokbox"><b id="tOkTitle"></b><span id="tOkSub"></span></div>
+    </div>
     <div class="ttip" id="tTip"></div>
     <div class="btns">
       <button class="act" id="tListen">Слушать</button>
@@ -914,19 +924,53 @@ async function runDemo(){
 /* ---------- настройка скрипки ---------- */
 const TSTR=[{n:'соль',m:55},{n:'ре',m:62},{n:'ля',m:69},{n:'ми',m:76}];
 const TUNE_OK=5;                       // в пределах стольких центов струна считается настроенной (как у обычных тюнеров)
-let tuneSel=null, tuneIdx=-1, tuneHold=0, tuneOk=[false,false,false,false];
+const TUNE_SHOW=1200;                  // столько мс горит зелёное «Настроено», потом — следующая струна
+const T_HZ=document.getElementById('tHz').textContent;
+let tuneSel=null, tuneIdx=-1, tuneHold=0, tuneOk=[false,false,false,false], tuneWait=null;
 function renderTuner(){
   const box=document.getElementById('tStrings'); box.innerHTML='';
   TSTR.forEach((t,i)=>{
     const b=document.createElement('button');
     b.className='tchip'+(i===tuneIdx?' on':'')+(i===tuneSel?' sel':'')+(tuneOk[i]?' ok':'');
     b.innerHTML=`<b>${t.n}</b><small>${(440*Math.pow(2,(t.m-69)/12)).toFixed(1)} Гц</small>`;
-    b.onclick=()=>{ tuneSel=(tuneSel===i? null : i); tuneIdx=i; tuneHold=0; renderTuner(); };
+    b.onclick=()=>{
+      clearTimeout(tuneWait); tuneWait=null; tuneHold=0;
+      tuneSel=(tuneSel===i? null : i); tuneIdx=i;
+      if(tuneSel==null && tuneOk[i]){ tuneIdle(i); return; }
+      tuneBox(''); renderTuner(); document.getElementById('tNeedle').classList.remove('live','ok');
+      document.getElementById('tNote').textContent=t.n;
+      document.getElementById('tHz').textContent=`нужно ${(440*Math.pow(2,(t.m-69)/12)).toFixed(1)} Гц`;
+      tuneTip(`Проведи смычком по струне «${t.n}».`);
+    };
     box.appendChild(b);
   });
 }
 function tuneTip(text,cls){ const el=document.getElementById('tTip'); el.textContent=text; el.className='ttip'+(cls?' '+cls:''); }
+function tuneBox(title,sub){            // зелёное окно поверх стрелки; пустой title — убрать
+  document.getElementById('tPanel').classList.toggle('done',!!title);
+  if(title){ document.getElementById('tOkTitle').textContent=title; document.getElementById('tOkSub').textContent=sub||''; }
+}
+function tuneDone(i){                   // струна настроена: зелёное окно, через миг — следующая
+  tuneOk[i]=true; tuneSel=null; tuneHold=0;
+  document.getElementById('tNeedle').classList.remove('live','ok');
+  renderTuner(); tuneTip('');
+  clearTimeout(tuneWait); tuneWait=null;
+  if(tuneOk.every(Boolean)) tuneIdle(i);
+  else { tuneBox('✓ Настроено',`струна «${TSTR[i].n}»`); tuneWait=setTimeout(()=>{ tuneWait=null; tuneIdle(i); },TUNE_SHOW); }
+}
+function tuneIdle(from){                // ждём следующую ненастроенную струну (правее, по кругу) или всё готово
+  if(tuneOk.every(Boolean)){
+    tuneBox('✓ Все струны настроены','можно играть!');
+    tuneTip('✓ Все четыре струны настроены — можно играть!','ok'); renderTuner(); return;
+  }
+  let k=from; do k=(k+1)%4; while(tuneOk[k]);
+  tuneIdx=k; tuneBox(''); renderTuner();
+  document.getElementById('tNote').textContent=TSTR[k].n;
+  document.getElementById('tHz').textContent=`следующая струна · нужно ${(440*Math.pow(2,(TSTR[k].m-69)/12)).toFixed(1)} Гц`;
+  tuneTip(`Теперь струна «${TSTR[k].n}» — проведи смычком по ней.`);
+}
 function tuneFrame(p){
+  if(tuneWait || (tuneSel==null && tuneOk.every(Boolean))) return;   // горит «Настроено» — не мешаем
   const nd=document.getElementById('tNeedle');
   if(!p){ nd.classList.remove('live','ok'); tuneHold=0; return; }
   const midiF=69+12*Math.log2(p.freq/440);
@@ -934,7 +978,9 @@ function tuneFrame(p){
   const fold=d=>d-12*Math.round(d/12);
   let i=tuneSel;
   if(i==null){ let best=99; TSTR.forEach((t,k)=>{ const d=Math.abs(fold(midiF-t.m)); if(d<best){best=d;i=k;} });
-    if(best>2.5){ nd.classList.remove('live','ok'); tuneTip('Это не открытая струна. Проведи смычком по струне без пальцев.'); return; } }
+    if(best>2.5){ nd.classList.remove('live','ok'); tuneTip('Это не открытая струна. Проведи смычком по струне без пальцев.'); return; }
+    if(tuneOk[i]){ nd.classList.remove('live','ok'); tuneHold=0;      // уже настроенную не трогаем (проверить заново — нажать на неё)
+      tuneTip(`Струна «${TSTR[i].n}» уже настроена ✓ — теперь «${TSTR[tuneIdx].n}».`,'ok'); return; } }
   if(i!==tuneIdx){ tuneIdx=i; tuneHold=0; renderTuner(); }
   const t=TSTR[i], c=Math.round(fold(midiF-t.m)*100), want=440*Math.pow(2,(t.m-69)/12);
   document.getElementById('tNote').textContent=t.n;
@@ -942,9 +988,8 @@ function tuneFrame(p){
   nd.classList.add('live'); nd.style.left=(50+Math.max(-50,Math.min(50,c)))+'%';
   nd.classList.toggle('ok',Math.abs(c)<=TUNE_OK);
   if(Math.abs(c)<=TUNE_OK){
-    if(++tuneHold>=45 && !tuneOk[i]){ tuneOk[i]=true; renderTuner(); }
-    tuneTip(tuneOk.every(Boolean)? '✓ Все четыре струны настроены — можно играть!' :
-            tuneOk[i]? `✓ Струна «${t.n}» настроена. Теперь следующая.` : `Чисто — подержи звук секунду…`, 'ok');
+    if(++tuneHold>=45){ tuneDone(i); return; }
+    tuneTip('Чисто — подержи звук секунду…','ok');
   } else {
     tuneHold=0;
     tuneTip(c<0? `Низковато (${c} ц) — подтяни струну: машинку у подставки — по часовой стрелке, понемногу.`
@@ -957,7 +1002,8 @@ async function tuneListen(){
   const err=await openMic(); if(err){ tuneTip(err); return; }
   mode='tune'; running=true; tuneHold=0;
   document.getElementById('tListen').textContent='Стоп';
-  tuneTip('Слушаю. Проведи смычком по открытой струне.');
+  if(tuneOk.some(Boolean) && !tuneWait && tuneSel==null) tuneIdle((tuneIdx+3)%4);   // часть уже настроена — сразу к следующей
+  else if(!tuneWait) tuneTip('Слушаю. Проведи смычком по открытой струне.');
   if(!raf) loop();
 }
 async function tunePlay(){            // открытая струна настоящей скрипкой (violin/long), точно в ноту
@@ -976,6 +1022,9 @@ async function tunePlay(){            // открытая струна наст�
 function openTuner(){
   stop(); document.body.classList.add('tuning');
   tuneOk=[false,false,false,false]; tuneSel=null; tuneIdx=-1; tuneHold=0;   // струны могли расстроиться — проверяем заново
+  clearTimeout(tuneWait); tuneWait=null; tuneBox('');
+  document.getElementById('tNote').textContent='—'; document.getElementById('tHz').textContent=T_HZ;
+  document.getElementById('tNeedle').classList.remove('live','ok');
   document.getElementById('tuner').hidden=false;
   renderTuner(); tuneTip('');
   document.querySelector('.btns').scrollIntoView({block:'start',behavior:'smooth'});
