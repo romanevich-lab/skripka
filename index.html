@@ -553,10 +553,15 @@ async function ensureCtx(){
   }
   if(ctx.state==='suspended') await ctx.resume();
 }
+// iPad/iPhone: без эхоподавления микрофон отдаёт звук тихо (на iPad Константина 15.10 в тишине 0.0004 при пороге 0.005,
+// на скрипку ничего не реагировало) — для разбора усиливаем. Тишина ×10 всё ещё ниже порога; число выбрано мной.
+const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+let MIC_GAIN=IOS? 10 : 1;
 function readMic(){                     // старые iPad (до iPadOS 14.5) не умеют читать звук дробными числами
-  if(analyser.getFloatTimeDomainData){ analyser.getFloatTimeDomainData(buf); return; }
-  const b=new Uint8Array(buf.length); analyser.getByteTimeDomainData(b);
-  for(let k=0;k<buf.length;k++) buf[k]=(b[k]-128)/128;
+  if(analyser.getFloatTimeDomainData) analyser.getFloatTimeDomainData(buf);
+  else { const b=new Uint8Array(buf.length); analyser.getByteTimeDomainData(b);
+         for(let k=0;k<buf.length;k++) buf[k]=(b[k]-128)/128; }
+  if(MIC_GAIN!==1 && mode!=='demo') for(let k=0;k<buf.length;k++) buf[k]*=MIC_GAIN;
 }
 let deadFrames=0;                       // кадры, где из микрофона идут ровные нули (живой микрофон так не может)
 function checkDead(){
@@ -570,7 +575,7 @@ function checkDead(){
 
 /* ---------- адрес с ?debug: внизу строка с цифрами — чтобы понять, что не так на чужом устройстве ---------- */
 const DEBUG=/debug/.test(location.search);
-let dbgEl=null, dbgN=0, dbgPeak=0, dbgT=0;
+let dbgEl=null, dbgN=0, dbgPeak=0, dbgT=0, dbgMax=0;
 if(DEBUG){
   dbgEl=document.createElement('div');
   dbgEl.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;padding:6px 10px;background:#222;color:#fff;font:13px/1.35 ui-monospace,Menlo,monospace';
@@ -579,14 +584,14 @@ if(DEBUG){
 }
 function debugFrame(p){
   dbgN++;
-  let r=0; for(let k=0;k<buf.length;k++) r+=buf[k]*buf[k]; r=Math.sqrt(r/buf.length);
-  dbgPeak=Math.max(dbgPeak,r);
+  let r=0; for(let k=0;k<buf.length;k++) r+=buf[k]*buf[k]; r=Math.sqrt(r/buf.length);   // уже с усилением
+  const g=mode==='demo'? 1 : MIC_GAIN;
+  dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  const saf=(navigator.userAgent.match(/Version\/([\d.]+)/)||[])[1]||'?';
-  dbgEl.textContent=`v4 · Safari ${saf} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
-    `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} · `+
-    (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : 'слышу —');
+  dbgEl.textContent=`v5 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+    `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
+    (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
 }
 
