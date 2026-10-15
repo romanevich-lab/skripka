@@ -96,8 +96,8 @@
   .needle u{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--ink);opacity:.35}
 
   .btns{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px}
-  /* настройка скрипки */
-  body.tuning #pickerCard, body.tuning .playrow, body.tuning #targetCard{display:none}
+  /* настройка скрипки: при открытии приложения — только она, остальное скрыто до «Пропустить» или до конца настройки */
+  body.tuning #mainBtns, body.tuning #pickerCard, body.tuning .playrow, body.tuning #targetCard{display:none}
   .tuner .thead{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:12px}
   .tuner .thead b{font-size:18px}
   .tuner .thead span{color:var(--muted);font-size:14px}
@@ -172,10 +172,10 @@
   .status{font-size:14px;color:var(--muted);min-height:22px;margin-top:10px}
 </style>
 </head>
-<body>
+<body class="tuning">
 <div class="wrap">
   <h1>Играй по нотам</h1>
-  <div class="btns">
+  <div class="btns" id="mainBtns">
     <button class="act" id="btnStart">Начать</button>
     <button class="act ghost" id="btnSkip" disabled>Пропустить ноту</button>
     <button class="act ghost" id="btnDemo">Демо (без скрипки)</button>
@@ -183,7 +183,7 @@
     <button class="act ghost" id="btnTune">Настроить скрипку</button>
   </div>
 
-  <div class="card tuner" id="tuner" hidden>
+  <div class="card tuner" id="tuner">
     <div class="thead"><b>Настройка скрипки</b><span>Нажми «Слушать» и проведи смычком по открытой струне — ровно и долго.</span></div>
     <div class="tstrings" id="tStrings"></div>
     <div class="tpanel" id="tPanel">
@@ -196,7 +196,7 @@
     <div class="btns">
       <button class="act" id="tListen">Слушать</button>
       <button class="act ghost" id="tPlay">▶ Послушать струну</button>
-      <button class="act ghost" id="tDone">Готово, играть</button>
+      <button class="act ghost" id="tDone">Пропустить настройку</button>
     </div>
   </div>
 
@@ -589,7 +589,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v5 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v6 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
@@ -833,21 +833,27 @@ function finish(){
 }
 
 /* ---------- запуск / стоп ---------- */
+// номер запроса микрофона: «Стоп», «Заново», демо, открытие и закрытие настройки отменяют запрос, который ещё ждёт
+// разрешения, — иначе микрофон, разрешённый позже, включился бы поверх того, что уже идёт, или остался гореть
+let micReq=0;
 async function openMic(){
+  const my=++micReq;
   try{
     await ensureCtx();
-    micStream=await navigator.mediaDevices.getUserMedia({audio:{
+    const s=await navigator.mediaDevices.getUserMedia({audio:{
       echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    if(my!==micReq){ s.getTracks().forEach(t=>t.stop()); return 'cancel'; }
+    micStream=s;
     micSrc=ctx.createMediaStreamSource(micStream);
     micSrc.connect(analyser);
     if(ctx.state!=='running') ctx.resume().catch(()=>{});   // iPad: после разрешения микрофона звук бывает «на паузе»
     deadFrames=0;
     return null;
-  }catch(e){ return 'Не получилось включить микрофон: '+e.message; }
+  }catch(e){ return my!==micReq? 'cancel' : 'Не получилось включить микрофон: '+e.message; }
 }
 async function start(){
   if(!melody) return;
-  const err=await openMic(); if(err){ setStatus(err); return; }
+  const err=await openMic(); if(err==='cancel') return; if(err){ setStatus(err); return; }
   document.getElementById('btnStart').textContent='Стоп';
   if(tempo.on){                                     // в темпе — всегда с начала, после счёта
     reset(); mode='tempo'; running=true; tempoStart();
@@ -864,7 +870,7 @@ async function start(){
 }
 
 function stop(){
-  running=false; mode=null; tl=null;
+  running=false; mode=null; tl=null; micReq++;
   if(metroBus){ try{metroBus.disconnect();}catch(e){} metroBus=null; }
   if(micSrc){ try{micSrc.disconnect();}catch(e){} micSrc=null; }
   if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
@@ -928,6 +934,7 @@ async function runDemo(){
     setStatus('Демо с живой скрипкой работает, только если открыть приложение через «Запустить.command». ('+e.message+')');
     return;
   }
+  if(tuningOn()){ setStatus(''); return; }          // пока готовился звук, открыли настройку — демо не играем
   mode='demo'; running=true;
   document.getElementById('btnDemo').textContent='Остановить демо';
   document.getElementById('btnStart').textContent='Стоп';
@@ -973,8 +980,12 @@ async function runDemo(){
 const TSTR=[{n:'соль',m:55},{n:'ре',m:62},{n:'ля',m:69},{n:'ми',m:76}];
 const TUNE_OK=5;                       // в пределах стольких центов струна считается настроенной (как у обычных тюнеров)
 const TUNE_SHOW=1200;                  // столько мс горит зелёное «Настроено», потом — следующая струна
+const TUNE_END=2000;                   // столько мс горит «Все струны настроены», потом настройка закрывается сама (число выбрано мной)
 const T_HZ=document.getElementById('tHz').textContent;
 let tuneSel=null, tuneIdx=-1, tuneHold=0, tuneOk=[false,false,false,false], tuneWait=null;
+let tuneMute=0;                        // до этого времени (часы звука) играет образец «Послушать струну» — его не засчитываем
+const tuningOn=()=>document.body.classList.contains('tuning');
+const tuneHearing=()=>running && mode==='tune';
 function renderTuner(){
   const box=document.getElementById('tStrings'); box.innerHTML='';
   TSTR.forEach((t,i)=>{
@@ -988,7 +999,7 @@ function renderTuner(){
       tuneBox(''); renderTuner(); document.getElementById('tNeedle').classList.remove('live','ok');
       document.getElementById('tNote').textContent=t.n;
       document.getElementById('tHz').textContent=`нужно ${(440*Math.pow(2,(t.m-69)/12)).toFixed(1)} Гц`;
-      tuneTip(`Проведи смычком по струне «${t.n}».`);
+      tuneTip(tuneHearing()? `Проведи смычком по струне «${t.n}».` : `Нажми «Слушать» и проведи смычком по струне «${t.n}».`);
     };
     box.appendChild(b);
   });
@@ -1007,19 +1018,23 @@ function tuneDone(i){                   // струна настроена: зе
   else { tuneBox('✓ Настроено',`струна «${TSTR[i].n}»`); tuneWait=setTimeout(()=>{ tuneWait=null; tuneIdle(i); },TUNE_SHOW); }
 }
 function tuneIdle(from){                // ждём следующую ненастроенную струну (правее, по кругу) или всё готово
-  if(tuneOk.every(Boolean)){
+  if(tuneOk.every(Boolean)){            // все четыре — «можно играть!», и через миг настройка закрывается сама
     tuneBox('✓ Все струны настроены','можно играть!');
-    tuneTip('✓ Все четыре струны настроены — можно играть!','ok'); renderTuner(); return;
+    tuneTip('✓ Все четыре струны настроены — можно играть!','ok'); renderTuner();
+    clearTimeout(tuneWait); tuneWait=setTimeout(()=>{ tuneWait=null; closeTuner(); },TUNE_END); return;
   }
   let k=from; do k=(k+1)%4; while(tuneOk[k]);
   tuneIdx=k; tuneBox(''); renderTuner();
   document.getElementById('tNote').textContent=TSTR[k].n;
   document.getElementById('tHz').textContent=`следующая струна · нужно ${(440*Math.pow(2,(TSTR[k].m-69)/12)).toFixed(1)} Гц`;
-  tuneTip(`Теперь струна «${TSTR[k].n}» — проведи смычком по ней.`);
+  tuneTip(tuneHearing()? `Теперь струна «${TSTR[k].n}» — проведи смычком по ней.`
+                       : `Теперь струна «${TSTR[k].n}» — нажми «Слушать» и проведи смычком по ней.`);
 }
 function tuneFrame(p){
   if(tuneWait || (tuneSel==null && tuneOk.every(Boolean))) return;   // горит «Настроено» — не мешаем
   const nd=document.getElementById('tNeedle');
+  // образец из динамика микрофон тоже слышит — иначе струна «настраивалась» бы сама, без скрипки
+  if(ctx.currentTime<tuneMute){ nd.classList.remove('live','ok'); tuneHold=0; return; }
   if(!p){ nd.classList.remove('live','ok'); tuneHold=0; return; }
   const midiF=69+12*Math.log2(p.freq/440);
   // какая струна: ближайшая по ноте в октаве (так не мешают ошибки разбора на октаву); или выбранная нажатием
@@ -1047,7 +1062,7 @@ function tuneFrame(p){
 async function tuneListen(){
   if(running && mode==='tune'){ stop(); return; }
   stop();
-  const err=await openMic(); if(err){ tuneTip(err); return; }
+  const err=await openMic(); if(err==='cancel') return; if(err){ tuneTip(err); return; }
   mode='tune'; running=true; tuneHold=0;
   document.getElementById('tListen').textContent='Стоп';
   if(tuneOk.some(Boolean) && !tuneWait && tuneSel==null) tuneIdle((tuneIdx+3)%4);   // часть уже настроена — сразу к следующей
@@ -1066,6 +1081,8 @@ async function tunePlay(){            // открытая струна наст�
   g.gain.setValueAtTime(1,t0); if(hold<whole-0.05){ g.gain.setValueAtTime(1,t0+hold); g.gain.setTargetAtTime(0,t0+hold,0.05); }
   src.connect(g); g.connect(ctx.destination);           // в динамик, не в разбор
   src.start(t0,s.start); src.stop(t0+Math.min(whole,hold+0.4));
+  tuneMute=t0+Math.min(whole,hold+0.4)+0.15;           // и ещё чуть-чуть — эхо комнаты
+  if(tuneHearing() && !tuneWait) tuneTip(`Слушай, как звучит струна «${t.n}», — потом сыграй её сам.`);
 }
 function openTuner(){
   stop(); document.body.classList.add('tuning');
@@ -1075,12 +1092,15 @@ function openTuner(){
   document.getElementById('tNeedle').classList.remove('live','ok');
   document.getElementById('tuner').hidden=false;
   renderTuner(); tuneTip('');
-  document.querySelector('.btns').scrollIntoView({block:'start',behavior:'smooth'});
+  scrollTo({top:0,behavior:'smooth'});
 }
 function closeTuner(){
   if(mode==='tune') stop();
+  clearTimeout(tuneWait); tuneWait=null; micReq++;   // «Слушать» ещё ждёт разрешения — после закрытия микрофон не нужен
+  const was=tuningOn();
   document.body.classList.remove('tuning');
   document.getElementById('tuner').hidden=true;
+  if(was){ scrollTo(0,0); render(); }   // наверх, к «Начать»; пока шла настройка, ноты были скрыты — раскладываем по настоящей ширине
 }
 document.getElementById('btnTune').onclick=()=>{ document.getElementById('tuner').hidden? openTuner() : closeTuner(); };
 document.getElementById('tListen').onclick=tuneListen;
@@ -1150,7 +1170,8 @@ let rt=null;
 addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(render,150); });
 
 melodySel.value=0; loadMelody(MELODIES[0]);
-if(location.search.includes('demo=1')) setTimeout(runDemo,300);
+openTuner();                            // приложение всегда начинается с настройки скрипки
+if(location.search.includes('demo=1')) setTimeout(()=>{ closeTuner(); runDemo(); },300);
 </script>
 <div class="okflash" id="okFlash" aria-live="polite"><b>✓</b>Верно<span id="okNext"></span></div>
 <div class="okflash count" id="countPill" aria-live="polite"></div>
