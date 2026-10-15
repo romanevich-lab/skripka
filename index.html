@@ -8,10 +8,12 @@
   :root{
     --bg:#f6f5f2; --card:#fff; --ink:#1d1c1a; --muted:#6f6b64; --line:#d9d5cd;
     --accent:#2f6fed; --ok:#1f9e5a; --warn:#d99000; --bad:#d2412f; --low:#7b4fd6;
+    --ok45:rgba(31,158,90,.45); --ok50:rgba(31,158,90,.5); --warn35:rgba(217,144,0,.35); --accent10:rgba(47,111,237,.1);
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#14140f; --card:#1e1e19; --ink:#f0eee8; --muted:#a09a90; --line:#3a3931;
-           --accent:#6f9dff; --ok:#3fbf7d; --warn:#e5aa2a; --bad:#f0685a; --low:#a88cf5; }
+           --accent:#6f9dff; --ok:#3fbf7d; --warn:#e5aa2a; --bad:#f0685a; --low:#a88cf5;
+           --ok45:rgba(63,191,125,.45); --ok50:rgba(63,191,125,.5); --warn35:rgba(229,170,42,.35); --accent10:rgba(111,157,255,.1); }
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
@@ -67,12 +69,12 @@
   .needle{--c:20%;--w:35%;position:relative;flex:1;min-height:120px;width:40px;border-radius:8px;overflow:hidden;
           background:linear-gradient(180deg,
             var(--line) 0%, var(--line) calc(50% - var(--w)),
-            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% - var(--w)),
-            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% - var(--c)),
-            color-mix(in srgb,var(--ok) 45%,transparent) calc(50% - var(--c)),
-            color-mix(in srgb,var(--ok) 45%,transparent) calc(50% + var(--c)),
-            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% + var(--c)),
-            color-mix(in srgb,var(--warn) 35%,transparent) calc(50% + var(--w)),
+            var(--warn35) calc(50% - var(--w)),
+            var(--warn35) calc(50% - var(--c)),
+            var(--ok45) calc(50% - var(--c)),
+            var(--ok45) calc(50% + var(--c)),
+            var(--warn35) calc(50% + var(--c)),
+            var(--warn35) calc(50% + var(--w)),
             var(--line) calc(50% + var(--w)), var(--line) 100%);}
   .needle i{position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2.5px;background:var(--ink);
             border-radius:2px;transition:top .06s linear;opacity:.15}
@@ -104,7 +106,7 @@
          font:inherit;cursor:pointer;text-align:center;line-height:1.2}
   .tchip b{display:block;font-size:20px}
   .tchip small{color:var(--muted);font-size:12px}
-  .tchip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .tchip.on{border-color:var(--accent);background:var(--accent10)}
   .tchip.sel{box-shadow:inset 0 0 0 2px var(--accent)}
   .tchip.ok{border-color:var(--ok);background:var(--ok);color:#fff}
   .tchip.ok small{color:#fff;opacity:.85}
@@ -120,7 +122,7 @@
   .tnow span{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
   .tmeter{position:relative;height:40px;margin-top:10px;border-radius:8px;overflow:hidden;
           background:linear-gradient(90deg,var(--line) 0%,var(--line) 45%,
-            color-mix(in srgb,var(--ok) 50%,transparent) 45%,color-mix(in srgb,var(--ok) 50%,transparent) 55%,
+            var(--ok50) 45%,var(--ok50) 55%,
             var(--line) 55%,var(--line) 100%)}
   .tmeter i{position:absolute;top:0;bottom:0;left:50%;width:5px;margin-left:-2.5px;background:var(--ink);border-radius:2px;
             transition:left .06s linear;opacity:.15}
@@ -546,8 +548,24 @@ async function ensureCtx(){
     ctx=new (window.AudioContext||window.webkitAudioContext)();
     analyser=ctx.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=0;
     buf=new Float32Array(analyser.fftSize);
+    // iPad: звонок, Siri, другое приложение «прерывают» звук — как только можно, включаем обратно
+    ctx.onstatechange=()=>{ if(running && ctx.state!=='running' && ctx.state!=='closed') ctx.resume().catch(()=>{}); };
   }
   if(ctx.state==='suspended') await ctx.resume();
+}
+function readMic(){                     // старые iPad (до iPadOS 14.5) не умеют читать звук дробными числами
+  if(analyser.getFloatTimeDomainData){ analyser.getFloatTimeDomainData(buf); return; }
+  const b=new Uint8Array(buf.length); analyser.getByteTimeDomainData(b);
+  for(let k=0;k<buf.length;k++) buf[k]=(b[k]-128)/128;
+}
+let deadFrames=0;                       // кадры, где из микрофона идут ровные нули (живой микрофон так не может)
+function checkDead(){
+  if(mode==='demo') return;
+  for(let k=0;k<buf.length;k++) if(buf[k]!==0){ deadFrames=0; return; }
+  if(++deadFrames!==120) return;        // ~2 с полной тишины — звук до программы не доходит
+  if(ctx.state!=='running') ctx.resume().catch(()=>{});
+  const msg='Микрофон молчит — звук не доходит до программы. Нажми «Стоп» и начни снова; не поможет — закрой вкладку и открой сайт заново.';
+  if(mode==='tune') tuneTip(msg,'move'); else setStatus(msg);
 }
 
 /* ---------- цикл слушания ---------- */
@@ -555,7 +573,7 @@ let stable=[], lastHeard=null;
 function loop(){
   raf=requestAnimationFrame(loop);
   if(!running) return;
-  analyser.getFloatTimeDomainData(buf);
+  readMic(); checkDead();
   const p=detectPitch(buf,ctx.sampleRate);
   if(mode==='tune'){ tuneFrame(p); return; }
   if(mode==='tempo'){ tempoFrame(p); return; }
@@ -794,6 +812,8 @@ async function openMic(){
       echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
     micSrc=ctx.createMediaStreamSource(micStream);
     micSrc.connect(analyser);
+    if(ctx.state!=='running') ctx.resume().catch(()=>{});   // iPad: после разрешения микрофона звук бывает «на паузе»
+    deadFrames=0;
     return null;
   }catch(e){ return 'Не получилось включить микрофон: '+e.message; }
 }
@@ -1008,7 +1028,7 @@ async function tuneListen(){
 }
 async function tunePlay(){            // открытая струна настоящей скрипкой (violin/long), точно в ноту
   await ensureCtx();
-  const t=TSTR[tuneSel ?? (tuneIdx>=0? tuneIdx : 2)];
+  const t=TSTR[tuneSel!=null? tuneSel : (tuneIdx>=0? tuneIdx : 2)];
   let s; try{ s=await loadNote('long',t.m); }catch(e){ tuneTip('Звук струны есть, только если открыть приложение через «Запустить.command».'); return; }
   const want=440*Math.pow(2,(t.m-69)/12), whole=(s.buf.duration-s.start)*s.f/want, hold=Math.min(whole,2.5);
   const src=ctx.createBufferSource(), g=ctx.createGain(), t0=ctx.currentTime+0.02;
