@@ -568,6 +568,28 @@ function checkDead(){
   if(mode==='tune') tuneTip(msg,'move'); else setStatus(msg);
 }
 
+/* ---------- адрес с ?debug: внизу строка с цифрами — чтобы понять, что не так на чужом устройстве ---------- */
+const DEBUG=/debug/.test(location.search);
+let dbgEl=null, dbgN=0, dbgPeak=0, dbgT=0;
+if(DEBUG){
+  dbgEl=document.createElement('div');
+  dbgEl.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;padding:6px 10px;background:#222;color:#fff;font:13px/1.35 ui-monospace,Menlo,monospace';
+  dbgEl.textContent='проверка: нажми «Начать» или «Слушать» и сыграй открытую ля';
+  document.body.appendChild(dbgEl); document.body.style.paddingBottom='70px';
+}
+function debugFrame(p){
+  dbgN++;
+  let r=0; for(let k=0;k<buf.length;k++) r+=buf[k]*buf[k]; r=Math.sqrt(r/buf.length);
+  dbgPeak=Math.max(dbgPeak,r);
+  const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
+  const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
+  const saf=(navigator.userAgent.match(/Version\/([\d.]+)/)||[])[1]||'?';
+  dbgEl.textContent=`v4 · Safari ${saf} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+    `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} · `+
+    (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : 'слышу —');
+  dbgPeak=0;
+}
+
 /* ---------- цикл слушания ---------- */
 let stable=[], lastHeard=null;
 function loop(){
@@ -575,6 +597,7 @@ function loop(){
   if(!running) return;
   readMic(); checkDead();
   const p=detectPitch(buf,ctx.sampleRate);
+  if(DEBUG) debugFrame(p);
   if(mode==='tune'){ tuneFrame(p); return; }
   if(mode==='tempo'){ tempoFrame(p); return; }
   const target=melody.notes[idx];
