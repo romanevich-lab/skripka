@@ -589,7 +589,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v6 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v7 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
@@ -1044,6 +1044,15 @@ function tuneFrame(p){
     if(best>2.5){ nd.classList.remove('live','ok'); tuneTip('Это не открытая струна. Проведи смычком по струне без пальцев.'); return; }
     if(tuneOk[i]){ nd.classList.remove('live','ok'); tuneHold=0;      // уже настроенную не трогаем (проверить заново — нажать на неё)
       tuneTip(`Струна «${TSTR[i].n}» уже настроена ✓ — теперь «${TSTR[tuneIdx].n}».`,'ok'); return; } }
+  else {                                  // струна выбрана нажатием, а звучит другая открытая — так и говорим, а не «подтяни»
+    // другая — если звук не дальше 1.5 полутона от неё (число выбрано мной: соседние струны в 7 полутонах друг от друга,
+    // так что выбранную ре/ля/ми, расстроенную даже на 5 полутонов, по-прежнему можно настроить). Но соль ниже нормы
+    // на 3.5+ полутона (ниже MIN_F) разбор слышит около «ре» — тогда тоже скажет «звучит ре»
+    const k=TSTR.findIndex((t,j)=>j!==i && Math.abs(midiF-t.m)<=1.5);
+    if(k>=0){ nd.classList.remove('live','ok'); tuneHold=0;
+      document.getElementById('tHz').textContent=`нужно ${(440*Math.pow(2,(TSTR[i].m-69)/12)).toFixed(1)} Гц`;
+      tuneTip(`Звучит струна «${TSTR[k].n}», а выбрана «${TSTR[i].n}».`,'move'); return; }
+  }
   if(i!==tuneIdx){ tuneIdx=i; tuneHold=0; renderTuner(); }
   const t=TSTR[i], c=Math.round(fold(midiF-t.m)*100), want=440*Math.pow(2,(t.m-69)/12);
   document.getElementById('tNote').textContent=t.n;
