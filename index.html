@@ -347,7 +347,14 @@ const MELODIES=[
 let melody=null;        // {notes:[...], measures:[[idx..]]}
 let idx=0;              // текущая нота
 let running=false, mode=null; // 'mic' | 'demo'
-let lastAccepted=-1, released=true, relCount=0;
+// одна и та же нота два раза подряд: вторая засчитывается, только когда её сыграли заново —
+// звук стих хотя бы на 30 мс (в 5 раз тише засчитанной, тишина или вдвое тише без ясной высоты), и та же нота зазвучала
+// втрое громче самого тихого места; или ~0.15 с без ясной высоты на уровне фона комнаты (в шумной комнате и на iPad
+// «втрое» бывает не достать); или ~0.3 с звучала другая нота (короче — так съезжает палец или говорят рядом).
+// Кадр-другой мимо, ошибка разбора на октаву, поправка пальцем через полутон, стук, кашель, голос — всё ещё та же нота
+// (раньше хватало 3 кадров мимо, и одна нота засчитывалась за две)
+const QUIET=0.2, RISE=3, QUIET_T=0.03, STOP_T=0.15, OTHER_T=0.3;   // секунды — по часам звука, не по кадрам
+let lastAccepted=-1, released=true, relPeak=0, relLow=-1, relQ0=-1, relS0=-1, floorLv=-1, floorT=0, otherMidi=-1, otherT=-1;
 
 function loadMelody(m){
   const notes=[], measures=[];
@@ -357,7 +364,7 @@ function loadMelody(m){
     measures.push(row);
   });
   melody={def:m, notes, measures};
-  idx=0; lastAccepted=-1; released=true; relCount=0;
+  idx=0; lastAccepted=-1; released=true;
   render(); updateTarget();
 }
 
@@ -589,7 +596,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v7 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v8 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
@@ -606,9 +613,10 @@ function loop(){
   if(mode==='tune'){ tuneFrame(p); return; }
   if(mode==='tempo'){ tempoFrame(p); return; }
   const target=melody.notes[idx];
+  if(mode==='mic') watchRelease(p, buf[0]===0 && buf[1]===0 && buf[2]===0);   // начало окна в нулях — микрофон только включился
 
   if(!p){
-    stable.length=0; if(++relCount>=3) released=true;   // ноту отпустили, если тишина дольше ~50 мс
+    stable.length=0; otherT=-1;
     showHeard(null,target);
     return;
   }
@@ -622,9 +630,15 @@ function loop(){
   stable.push({midi,cents});
   if(stable.length>24) stable.shift();
 
-  // ноту отпустили, если ~50 мс звучит другая нота; один ошибочный кадр — не в счёт
-  if(midi===lastAccepted) relCount=0; else if(++relCount>=3) released=true;
-  if(stable.length<5 || !released) return;
+  // ~0.3 с держится другая нота (не та же в другой октаве и не поправка пальцем) — значит, с прежней ушли
+  if(sameNote(midiF)) otherT=-1; else if(otherT<0 || midi!==otherMidi){ otherMidi=midi; otherT=ctx.currentTime; }
+  if(!released && otherT>=0 && ctx.currentTime-otherT>=OTHER_T) released=true;
+  if(holding(midiF)){                             // только что засчитанную ещё держат — не засчитываем и не ругаем
+    if(target.midi===lastAccepted) setStatus('');  // нота та, что нужна, — старое «Слышу …» уже неправда
+    return;
+  }
+  if(!released && target.midi===lastAccepted) return;   // нужна та же нота ещё раз, а звучит другая, но меньше 0.3 с — пока не ругаем
+  if(stable.length<5) return;
 
   const last=stable.slice(-6);
   const avg=Math.round(last.reduce((s,v)=>s+v.cents,0)/last.length);
@@ -640,7 +654,7 @@ function loop(){
     target.cents=avg;
     target.state = (target.miss==null && target.wrong.length===0) ? 'ok'
                  : (target.wrong.length<=1) ? 'mid' : 'bad';
-    lastAccepted=midi; released=false; relCount=0; stable.length=0;
+    lastAccepted=midi; released=false; relPeak=p.rms; relLow=-1; relQ0=-1; relS0=-1; otherT=-1; stable.length=0;
     advance();
   } else if(stable.length>=8){
     if(!target.wrong.includes(midi)) target.wrong.push(midi);
@@ -650,6 +664,37 @@ function loop(){
       : `Слышу «${nm.ru}» — нужна «${target.ru}». Поправь и держи звук.`);
   }
 }
+
+// звучит засчитанная нота: та же высота ±¾ тона (палец поправляют) или она же октавой выше/ниже либо дуодецимой ниже
+// (так ошибается разбор; дуодецима — когда смычок задел соседнюю открытую струну)
+function sameNote(midiF){
+  const d=midiF-lastAccepted;
+  return Math.abs(d-12*Math.round(d/12))<0.75 || Math.abs(d+19.02)<0.75;
+}
+// засчитанную ноту ещё держат: если нужна она же ещё раз — sameNote; если нужна другая — как и раньше, только сама прежняя
+function holding(midiF){
+  if(released) return false;
+  const t=melody.notes[idx];
+  if(t && t.midi===lastAccepted) return sameNote(midiF);
+  return Math.round(midiF)===lastAccepted;
+}
+function watchRelease(p,partial){       // громкость кадра; buf уже без постоянной составляющей (после detectPitch)
+  let e=0; for(let k=0;k<buf.length;k++) e+=buf[k]*buf[k];
+  const lvl=Math.sqrt(e/buf.length), now=ctx.currentTime, dt=floorT? Math.min(0.2,now-floorT) : 0; floorT=now;
+  // фон комнаты — самый тихий кадр без ноты (не полупустое окно сразу после включения микрофона); если в комнате
+  // стало шумнее, подтягивается вверх за несколько секунд
+  if(!p && lvl>0 && !partial) floorLv= floorLv<0 || lvl<floorLv? lvl : floorLv+(lvl-floorLv)*dt/5;
+  if(released) return;
+  if(!p && lvl<=2*floorLv){ if(relS0<0) relS0=now; if(now-relS0>=STOP_T){ release(); return; } } else relS0=-1;   // смычок сняли
+  const same= !!p && Math.abs(69+12*Math.log2(p.freq/440)-lastAccepted)<0.75;   // слышна та самая нота (стук, кашель — нет)
+  if(relLow<0){
+    if(same && lvl>relPeak) relPeak=lvl;
+    if(lvl<QUIET*relPeak || lvl<GATE || (!p && lvl<0.5*relPeak)){ if(relQ0<0) relQ0=now; if(now-relQ0>=QUIET_T) relLow=lvl; }   // стихла
+    else relQ0=-1;
+  } else if(lvl<relLow) relLow=lvl;
+  else if(same && lvl>=GATE && lvl>=RISE*relLow) release();                                     // и зазвучала снова
+}
+function release(){ released=true; stable.length=0; }
 
 function flashOk(text){
   const el=document.getElementById('okFlash');
@@ -797,7 +842,7 @@ function paintArrow(){
 
 function showHeard(h,target){
   // только что засчитанную ноту ещё держат — стрелку к следующей пока не показываем
-  const mf= h && !(h.midi===lastAccepted && !released)? 69+12*Math.log2(h.freq/440) : null;
+  const hf= h? 69+12*Math.log2(h.freq/440) : null, mf= h && !holding(hf)? hf : null;
   drawBoard(target, mf); noteArrow(target, mf);
   const hn=document.getElementById('heardNote'), hi=document.getElementById('heardInfo');
   const nd=document.getElementById('needle');
@@ -1120,7 +1165,7 @@ document.getElementById('tDone').onclick=closeTuner;
 function reset(){
   if(!melody) return;
   melody.notes.forEach(n=>{n.state='';n.cents=null;n.miss=null;n.wrong=[];});
-  idx=0; lastAccepted=-1; released=true; relCount=0; stable.length=0;
+  idx=0; lastAccepted=-1; released=true; stable.length=0;
   setStatus(''); paint(); updateTarget();
 }
 
