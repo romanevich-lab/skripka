@@ -184,7 +184,7 @@
   </div>
 
   <div class="card tuner" id="tuner">
-    <div class="thead"><b>Настройка скрипки</b><span>Нажми «Слушать» и проведи смычком по открытой струне — ровно и долго.</span></div>
+    <div class="thead"><b>Настройка скрипки</b><span>Нажми «Начать» и проведи смычком по открытой струне — ровно и долго.</span></div>
     <div class="tstrings" id="tStrings"></div>
     <div class="tpanel" id="tPanel">
       <div class="tnow"><span class="tbig" id="tNote">—</span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
@@ -194,7 +194,7 @@
     </div>
     <div class="ttip" id="tTip"></div>
     <div class="btns">
-      <button class="act" id="tListen">Слушать</button>
+      <button class="act" id="tListen">Начать</button>
       <button class="act ghost" id="tPlay">▶ Послушать струну</button>
       <button class="act ghost" id="tDone">Пропустить настройку</button>
     </div>
@@ -586,7 +586,7 @@ let dbgEl=null, dbgN=0, dbgPeak=0, dbgT=0, dbgMax=0;
 if(DEBUG){
   dbgEl=document.createElement('div');
   dbgEl.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;padding:6px 10px;background:#222;color:#fff;font:13px/1.35 ui-monospace,Menlo,monospace';
-  dbgEl.textContent='проверка: нажми «Начать» или «Слушать» и сыграй открытую ля';
+  dbgEl.textContent='проверка: нажми «Начать» и сыграй открытую ля';
   document.body.appendChild(dbgEl); document.body.style.paddingBottom='70px';
 }
 function debugFrame(p){
@@ -921,7 +921,7 @@ function stop(){
   if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
   stopDemo();
   document.getElementById('btnStart').textContent='Начать';
-  document.getElementById('tListen').textContent='Слушать';
+  document.getElementById('tListen').textContent='Начать';
   document.getElementById('btnDemo').textContent='Демо (без скрипки)';
   document.getElementById('btnSkip').disabled=true;
   showHeard(null,melody?melody.notes[Math.min(idx,melody.notes.length-1)]:{midi:69});
@@ -1044,7 +1044,7 @@ function renderTuner(){
       tuneBox(''); renderTuner(); document.getElementById('tNeedle').classList.remove('live','ok');
       document.getElementById('tNote').textContent=t.n;
       document.getElementById('tHz').textContent=`нужно ${(440*Math.pow(2,(t.m-69)/12)).toFixed(1)} Гц`;
-      tuneTip(tuneHearing()? `Проведи смычком по струне «${t.n}».` : `Нажми «Слушать» и проведи смычком по струне «${t.n}».`);
+      tuneTip(tuneHearing()? `Проведи смычком по струне «${t.n}».` : `Нажми «Начать» и проведи смычком по струне «${t.n}».`);
     };
     box.appendChild(b);
   });
@@ -1073,7 +1073,7 @@ function tuneIdle(from){                // ждём следующую нена�
   document.getElementById('tNote').textContent=TSTR[k].n;
   document.getElementById('tHz').textContent=`следующая струна · нужно ${(440*Math.pow(2,(TSTR[k].m-69)/12)).toFixed(1)} Гц`;
   tuneTip(tuneHearing()? `Теперь струна «${TSTR[k].n}» — проведи смычком по ней.`
-                       : `Теперь струна «${TSTR[k].n}» — нажми «Слушать» и проведи смычком по ней.`);
+                       : `Теперь струна «${TSTR[k].n}» — нажми «Начать» и проведи смычком по ней.`);
 }
 function tuneFrame(p){
   if(tuneWait || (tuneSel==null && tuneOk.every(Boolean))) return;   // горит «Настроено» — не мешаем
@@ -1150,7 +1150,7 @@ function openTuner(){
 }
 function closeTuner(){
   if(mode==='tune') stop();
-  clearTimeout(tuneWait); tuneWait=null; micReq++;   // «Слушать» ещё ждёт разрешения — после закрытия микрофон не нужен
+  clearTimeout(tuneWait); tuneWait=null; micReq++;   // «Начать» ещё ждёт разрешения — после закрытия микрофон не нужен
   const was=tuningOn();
   document.body.classList.remove('tuning');
   document.getElementById('tuner').hidden=true;
