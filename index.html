@@ -134,7 +134,7 @@
   .needle u{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--ink);opacity:.35}
 
   /* ноты */
-  #sheet{overflow-x:hidden}
+  #sheet{overflow-x:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none}
   #sheet svg{display:block;width:100%;height:auto}
   .staffline{stroke:var(--ink);stroke-width:1;opacity:.55}
   .bar{stroke:var(--ink);stroke-width:1.2;opacity:.55}
@@ -308,8 +308,7 @@
         <button class="act" id="btnLoad">Загрузить ноты…</button>
         <button class="act ghost" id="btnType">Набрать ноты</button>
       </div>
-      <input type="file" id="fileIn" hidden multiple
-             accept=".xml,.musicxml,.mxl,.mid,.midi,.abc,.txt,text/xml,application/xml,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,audio/midi,audio/x-midi,audio/mid,text/plain,text/vnd.abc">
+      <input type="file" id="fileIn" hidden multiple>
     </div>
     <div id="lessons"></div>
   </div>
@@ -430,11 +429,11 @@
       </details>
     </div>
     <div id="tabText" hidden>
-      <textarea id="txtIn" placeholder="ре ми фа# соль | ля- ля- | си си си си | ля---" spellcheck="false"></textarea>
+      <textarea id="txtIn" placeholder="ре1 ми1 фа#1 соль1 | ля1- ля1- | си1 си1 си1 си1 | ля1---" spellcheck="false"></textarea>
       <div class="help small muted" style="margin-top:6px">
         <p>Ноты через пробел: <code>до ре ми фа соль ля си</code> (или <code>C D E F G A B</code>), диез <code>#</code>, бемоль <code>b</code>. Такты — <code>|</code>.</p>
         <p>Длина: нота без знака — четверть; <code>ля-</code> — половинная, <code>ля---</code> — целая, <code>ля/</code> — восьмая, <code>ля.</code> — с точкой. Пауза — <code>п</code>.</p>
-        <p>Октава: <code>ля1</code> — первая, <code>ми2</code> — вторая, <code>сольм</code> — малая; без цифры — ближайшая к предыдущей ноте.</p>
+        <p>Октава лучше писать: <code>ля1</code> — первая, <code>ми2</code> — вторая, <code>сольм</code> — малая. Без цифры берётся октава, ближайшая к предыдущей ноте (после <code>ре</code> голое <code>ля</code> уйдёт вниз). Повтор: <code>|:</code> и <code>:|</code>.</p>
         <p>Можно задать строками: <code>Название: …</code>, <code>Размер: 3/4</code>, <code>Темп: 80</code>, <code>Тональность: ре мажор</code>. Понимает и ABC-запись.</p>
       </div>
       <div class="btns" style="margin-top:10px"><button class="act" id="txtGo">Готово</button></div>
@@ -666,7 +665,7 @@ function parseMusicXML(text, fileName, opts){ opts=opts||{};
 function baseName(f){ return (f||'Ноты').replace(/\.[^.]+$/,'').replace(/[_]+/g,' '); }
 
 function readPart(measures){
-  let divisions=1, fifths=0, beats=4, beatType=4, transposeChrom=0, transposeOct=0;
+  let divisions=1, fifths=0, writtenFifths=0, beats=4, beatType=4, transposeChrom=0, transposeOct=0;
   let bpm=null;
   // сначала — какой голос и какой нотный стан ведут мелодию
   const voiceCount={}, staffCount={};
@@ -686,9 +685,10 @@ function readPart(measures){
     for(const el of m.children){
       if(el.name==='attributes'){
         divisions=X.num(el,'divisions',divisions);
-        const k=X.child(el,'key'); if(k){ fifths=X.num(k,'fifths',fifths); meas.fifths=fifths; meas.newKey=true; }
+        const k=X.child(el,'key'); if(k){ writtenFifths=X.num(k,'fifths',writtenFifths); }
         const t=X.child(el,'time'); if(t){ beats=X.num(t,'beats',beats); beatType=X.num(t,'beat-type',beatType); meas.beats=beats; meas.beatType=beatType; meas.newTime=true; }
         const tr=X.child(el,'transpose'); if(tr){ transposeChrom=X.num(tr,'chromatic',0); transposeOct=X.num(tr,'octave-change',0); }
+        if(k||tr){ const sh=((transposeChrom*7)%12+12)%12; let sf=writtenFifths+(sh>6? sh-12 : sh); if(sf>6) sf-=12; if(sf<-6) sf+=12; fifths=sf; meas.fifths=fifths; meas.newKey=true; }   // звучащая тональность
       } else if(el.name==='backup'){ cur-=X.num(el,'duration',0); }
       else if(el.name==='forward'){ cur+=X.num(el,'duration',0); }
       else if(el.name==='direction'||el.name==='sound'||el.name==='barline'){
@@ -701,8 +701,8 @@ function readPart(measures){
             if(X.child(dt,'segno')) meas.bar.segno=true; if(X.child(dt,'coda')) meas.bar.coda=true;
             const w=X.children(dt,'words').map(x=>x.text).join(' ');
             if(/\bfine\b/i.test(w)) meas.bar.fine=true;
-            if(/d\.?\s*c\.?/i.test(w)) meas.bar.dacapo=true;
-            if(/d\.?\s*s\.?/i.test(w)) meas.bar.dalsegno=true;
+            if(/\bd\.?\s*c\b\.?/i.test(w)||/\bda\s+capo\b/i.test(w)) meas.bar.dacapo=true;
+            if(/\bd\.?\s*s\b\.?/i.test(w)||/\bdal\s+segno\b/i.test(w)) meas.bar.dalsegno=true;
             if(/to\s+coda/i.test(w)) meas.bar.tocoda=true;
           });
         }
@@ -742,7 +742,12 @@ function readPart(measures){
       }
     }
     // мелодическая линия: выбранный голос и стан; аккорд — верхняя нота
-    const mine=raw.filter(e=>e.voice===voice && e.staff===staff);
+    let mine=raw.filter(e=>e.voice===voice && e.staff===staff);
+    if(!mine.some(e=>!e.rest)){                         // ведущий голос в этом такте молчит — берём самый занятый другой голос того же стана
+      const oc={}; raw.forEach(e=>{ if(e.staff===staff && e.voice!==voice && !e.rest) oc[e.voice]=(oc[e.voice]||0)+1; });
+      const alt=Object.keys(oc).sort((x,y)=>oc[y]-oc[x]||(+x)-(+y))[0];
+      if(alt) mine=raw.filter(e=>e.voice===alt && e.staff===staff);
+    }
     const groups=[]; mine.forEach(e=>{ const g=groups.length? groups[groups.length-1] : null; if(e.chord && g && Math.abs(g.start-e.start)<1e-9) g.list.push(e); else groups.push({start:e.start,list:[e]}); });
     groups.sort((a,b)=>a.start-b.start);
     groups.forEach(g=>{ const notes=g.list.filter(e=>!e.rest); const e= notes.length? notes.reduce((a,b)=>b.midi>a.midi?b:a) : g.list[0];
@@ -819,7 +824,7 @@ function parseMIDI(bytes, fileName, opts){ opts=opts||{};
       cands.push({ti, ch:+ch, notes:ns, score:s, name:tr.name}); } });
   if(!cands.length) throw new Error('в MIDI-файле нет нот');
   cands.sort((a,b)=>b.score-a.score);
-  const c= (opts.track!=null && cands[opts.track]) || cands[0];
+  const ci=(opts.track!=null && cands[opts.track])? +opts.track : 0; const c=cands[ci];
   // мелодия: при одновременных нотах — верхняя; наложения обрезаем; сетка — шестнадцатые
   const grid=ppq/4;
   const ns=c.notes.slice().sort((a,b)=>a.tick-b.tick||b.midi-a.midi);
@@ -828,7 +833,11 @@ function parseMIDI(bytes, fileName, opts){ opts=opts||{};
     if(last && n.tick-last.tick<grid*0.5){ if(n.midi>last.midi){ last.midi=n.midi; last.dur=Math.max(last.dur,n.dur); } continue; }
     if(last && last.tick+last.dur>n.tick) last.dur=n.tick-last.tick;
     line.push({tick:n.tick, dur:n.dur, midi:n.midi}); }
-  const qz=v=>Math.round(v/grid)*grid;
+  // сетка: шестнадцатые, а в долях, где ноты ложатся на триольную сетку лучше, — триоли
+  const grid3=ppq/6; const beatGrid={};
+  for(const n of line){ const k=Math.floor(n.tick/ppq); const e4=Math.abs(Math.round(n.tick/grid)*grid-n.tick), e6=Math.abs(Math.round(n.tick/grid3)*grid3-n.tick); beatGrid[k]=(beatGrid[k]||0)+(e4-e6); }
+  const gridAt=v=>beatGrid[Math.floor(v/ppq)]>0? grid3 : grid;
+  const qz=v=>{ const g=gridAt(v); return Math.round(v/g)*g; };
   const evs=line.map(n=>{ const t0=qz(n.tick); let t1=qz(n.tick+n.dur); if(t1<=t0) t1=t0+grid; return {tick:t0, end:t1, midi:n.midi}; }).filter(e=>e.end>e.tick);
   for(let i=0;i+1<evs.length;i++) if(evs[i].end>evs[i+1].tick) evs[i].end=evs[i+1].tick;
   const good=evs.filter(e=>e.end>e.tick);
@@ -861,7 +870,7 @@ function parseMIDI(bytes, fileName, opts){ opts=opts||{};
   const bpm= tempos.length? Math.round(60000000/tempos.sort((a,b)=>a.tick-b.tick)[0].us) : null;
   return {source:'midi', title:(c.name&&!/^track/i.test(c.name)? c.name : (tracks[0].name||baseName(fileName))), bpm, fifths, beats:measures[0]?measures[0].beats:4, beatType:measures[0]?measures[0].beatType:4,
           rawMeasures:measures.map(m=>({num:m.num, events:m.events, bar:m.bar, fifths:m.fifths, beats:m.beats, beatType:m.beatType})),
-          alternatives: cands.length>1? cands.map((x,i)=>({label:(x.name||('трек '+(x.ti+1)))+' · канал '+(x.ch+1)+' · '+x.notes.length+' нот', key:i, kind:'track'})) : undefined};
+          trackIdx:ci, alternatives: cands.length>1? cands.map((x,i)=>({label:(x.name||('трек '+(x.ti+1)))+' · канал '+(x.ch+1)+' · '+x.notes.length+' нот', key:i, kind:'track'})) : undefined};
 }
 function guessKey(midis){
   if(!midis.length) return 0;
@@ -892,18 +901,19 @@ function parseABC(text, fileName){
   const tunes=text.split(/\n(?=X:)/); let body=tunes.find(t=>/^\s*X:/m.test(t))||text;
   if(!/^\s*X:/m.test(body)) body='X:1\n'+body;
   const lines=body.split('\n');
-  const hdr={T:[], M:'4/4', L:null, Q:null, K:'C', C:''};
+  const hdr={T:[], M:'4/4', L:null, Q:null, K:'C', C:''}; let firstVoiceHdr=null;
   let i=0, inHeader=true; const music=[];
   for(;i<lines.length;i++){
     const ln=lines[i].replace(/%.*$/,'');
     const f=/^([A-Za-z]):(.*)$/.exec(ln);
-    if(inHeader && f){ const [,k,v]=f; if(k==='T') hdr.T.push(v.trim()); else if(k==='K'){ hdr.K=v.trim(); inHeader=false; } else if(k in hdr && k!=='T') hdr[k]=v.trim(); else if(k==='M'||k==='L'||k==='Q'||k==='C') hdr[k]=v.trim(); continue; }
+    if(inHeader && f){ const [,k,v]=f; if(k==='T') hdr.T.push(v.trim()); else if(k==='V'){ if(firstVoiceHdr==null) firstVoiceHdr=v.trim().split(/\s/)[0]; } else if(k==='K'){ hdr.K=v.trim(); inHeader=false; } else if(k in hdr && k!=='T') hdr[k]=v.trim(); else if(k==='M'||k==='L'||k==='Q'||k==='C') hdr[k]=v.trim(); continue; }
     if(inHeader){ if(ln.trim()==='') continue; inHeader=false; }
     music.push(ln);
   }
   // голоса: только первый
-  let voiceSeen=null; const mus=[];
-  for(const ln of music){ const v=/^V:\s*(\S+)/.exec(ln); if(v){ if(voiceSeen==null) voiceSeen=v[1]; else if(v[1]!==voiceSeen){ voiceSeen='__other'; } continue; } if(voiceSeen==='__other') continue; mus.push(ln); }
+  let firstVoice=firstVoiceHdr, curVoice=null; const mus=[];
+  for(const ln of music){ const v=/^V:\s*(\S+)/.exec(ln); if(v){ if(firstVoice==null) firstVoice=v[1]; curVoice=v[1]; continue; } if(curVoice!=null && curVoice!==firstVoice && !/^\[V:/.test(ln)) continue; mus.push(ln); }
+  curVoice=null;                        // строки других голосов уже убраны; дальше голос меняют только [V:] внутри строк
   const meter=parseMeter(hdr.M); let beats=meter.beats, beatType=meter.beatType;
   let unit= hdr.L? fracVal(hdr.L) : (beats/beatType<0.75? 1/16 : 1/8);
   const key=abcKeyFifths(hdr.K); let fifths=key.fifths, keyExtra=key.extra;
@@ -911,17 +921,19 @@ function parseABC(text, fileName){
   const measures=[]; let cur=null; const pending={}; // pending accidentals in measure
   const newMeasure=()=>{ cur={num:String(measures.length+1), events:[], bar:{}, fifths, beats, beatType}; measures.push(cur); for(const k in pending) delete pending[k]; return cur; };
   const closeEmpty=()=>{ if(cur && cur.events.length===0){ measures.pop(); cur=measures[measures.length-1]||null; } };
-  let broken=0, brokenNext=0, tupN=0, tupMul=1, tieNext=false, lineNotes=[];
+  let brokenNext=0, tupN=0, tupMul=1, tieNext=false, lineNotes=[], lyrDone=false;
   const lyricLines=[];
   for(const rawLn of mus){
     let ln=rawLn;
-    const wm=/^w:(.*)$/.exec(ln); if(wm){ lyricLines.push({syls:wm[1], notes:lineNotes.slice()}); continue; }
+    const wm=/^w:(.*)$/.exec(ln); if(wm){ if(!lyrDone){ lyricLines.push({syls:wm[1], notes:lineNotes.slice()}); lyrDone=true; } continue; }
     if(/^[A-Za-z]:/.test(ln)){ const f=/^([A-Za-z]):(.*)$/.exec(ln); applyField(f[1],f[2].trim()); continue; }
     ln=ln.replace(/%.*$/,'').replace(/\\\s*$/,'');
-    lineNotes=[];
+    if(ln.trim()==='') continue;
+    lineNotes=[]; lyrDone=false;
     let j=0;
     while(j<ln.length){
       const c=ln[j];
+      if(curVoice!=null && curVoice!==firstVoice) break;      // строка другого голоса — пропускаем
       if(c===' '||c==='\t'){ j++; continue; }
       if(c==='['&&/^\[[A-Za-z]:/.test(ln.slice(j))){ const e=ln.indexOf(']',j); const f=ln.slice(j+1,e); applyField(f[0],f.slice(2).trim()); j=e+1; continue; }
       if(c==='"'){ const e=ln.indexOf('"',j+1); j= e<0? ln.length : e+1; continue; }
@@ -947,7 +959,7 @@ function parseABC(text, fileName){
         continue;
       }
       // аккорд: верхняя нота
-      if(c==='['){ const e=ln.indexOf(']',j); const inner=ln.slice(j+1, e<0? ln.length : e); let after=ln.slice(e+1); const lm=/^[\d\/>]*/.exec(after)[0];
+      if(c==='['){ const e=ln.indexOf(']',j); const inner=ln.slice(j+1, e<0? ln.length : e); let after=ln.slice(e+1); const lm=/^[\d\/]*/.exec(after)[0];
         const notes=[]; const re=/([_^=]*)([A-Ga-g])([,']*)(\d*\/*\d*)/g; let a; while((a=re.exec(inner))) notes.push(a);
         if(notes.length){ const top=notes.map(a=>({a, midi:abcMidi(a[1],a[2],a[3]).midi})).reduce((x,y)=>y.midi>x.midi?y:x).a; pushNote(top[1],top[2],top[3],(top[4]||'')+lm); }
         j= (e<0? ln.length : e+1)+lm.length; continue; }
@@ -957,7 +969,8 @@ function parseABC(text, fileName){
       if(rm){ j+=rm[0].length; if(rm[1]==='Z'||rm[1]==='X'){ const n=parseInt(rm[2]||'1')||1; for(let k=0;k<n;k++){ if(!cur||cur.events.length) { closeEmpty(); newMeasure(); } cur.events.push({rest:true,q:beats*4/beatType}); } }
         else pushRest(rm[2]||''); continue; }
       if(c==='-'){ tieNext=true; j++; continue; }
-      if(c==='>'||c==='<'){ let k=j; while(ln[k]===c) k++; broken=(c==='>'?1:-1)*(k-j); j=k; continue; }
+      if(c==='>'||c==='<'){ let k=j; while(ln[k]===c) k++; const f=Math.pow(2,k-j); const last= cur&&cur.events.length? cur.events[cur.events.length-1] : null;
+        if(last){ if(c==='>'){ last.q*=(2-1/f); brokenNext=1/f; } else { last.q*=1/f; brokenNext=2-1/f; } } j=k; continue; }
       j++;
     }
     // конец строки — оторванная лига «-» не переносим
@@ -969,6 +982,7 @@ function parseABC(text, fileName){
     else if(k==='L'){ unit=fracVal(v)||unit; }
     else if(k==='Q'){ if(bpm==null) bpm=abcTempo(v,unit); }
     else if(k==='T'){ hdr.T.push(v); }
+    else if(k==='V'){ const id=v.split(/\s/)[0]; if(firstVoice==null) firstVoice=id; curVoice=id; }
   }
   function lenOf(s){ // "2", "3/2", "/", "//", "/4", "3"
     if(!s) return 1;
@@ -979,7 +993,6 @@ function parseABC(text, fileName){
   function dur(lenStr){ let d=lenOf(lenStr)*unit*4; if(tupN>0){ d*=tupMul; tupN--; }
     if(brokenNext){ d*=brokenNext; brokenNext=0; }
     return d; }
-  function applyBroken(ev){ if(!broken) return; const f=Math.pow(2,Math.abs(broken)); if(broken>0){ ev.q*=(2-1/f); brokenNext=1/f; } else { ev.q*=1/f; brokenNext=2-1/f; } broken=0; }
   function abcMidi(acc,letter,octs){
     const L=letter.toUpperCase(); let oct= letter===L? 4 : 5; for(const ch of octs){ if(ch==="'") oct++; else if(ch===',') oct--; }
     let alter;
@@ -992,12 +1005,12 @@ function parseABC(text, fileName){
     if(!cur) newMeasure();
     const q=dur(lenStr);
     const p=abcMidi(acc,letter,octs);
-    const ev={...p, q, tieStop:tieNext}; tieNext=false; applyBroken(ev);
+    const ev={...p, q, tieStop:tieNext}; tieNext=false;
     cur.events.push(ev); lineNotes.push(ev);
     if(cur.events.length>1){ const prev=cur.events[cur.events.length-2]; if(ev.tieStop&&!prev.rest) prev.tieStart=true; }
     else if(ev.tieStop){ const pm=measures[measures.length-2]; const pe=pm&&pm.events[pm.events.length-1]; if(pe&&!pe.rest) pe.tieStart=true; }
   }
-  function pushRest(lenStr){ if(!cur) newMeasure(); const ev={rest:true, q:dur(lenStr)}; applyBroken(ev); cur.events.push(ev); tieNext=false; }
+  function pushRest(lenStr){ if(!cur) newMeasure(); cur.events.push({rest:true, q:dur(lenStr)}); tieNext=false; }
   // слова: по слогам к нотам строки
   lyricLines.forEach(({syls,notes:ln})=>{ const notes=ln.filter(n=>!n.tieStop);            // залигованная нота слога не получает
     const toks=syls.replace(/\|/g,' ').trim().split(/\s+/).flatMap(w=>w.split(/(?<=-)/)).filter(Boolean); let k=0;
@@ -1024,7 +1037,7 @@ function parseSimple(text){
       continue; }
     body.push(ln.replace(/(%|\/\/).*$/,''));
   }
-  const toks=body.join(' ').replace(/\|/g,' | ').split(/\s+/).filter(Boolean);
+  const toks=body.join(' ').replace(/\|:|:\||\|/g,m=>' '+m+' ').split(/\s+/).filter(Boolean);
   const measures=[]; let cur=null; let prevMidi=null; let any=false;
   const newM=()=>{ cur={num:String(measures.length+1),events:[],bar:{},fifths,beats,beatType}; measures.push(cur); };
   const pending={};
@@ -1085,19 +1098,27 @@ function splitDur(q){
 function expandRepeats(ms){
   // порядок тактов при игре: повторы |: :|, вольты, D.C./D.S. al Fine, кода. «:|» без «|:» повторяет с конца прошлого повтора
   const out=[]; let i=0, start=0, jumped=null, guard=0; const passes={};
+  // конец вольты: её endStop, или «:|», или начало следующей вольты
+  const voltaEnd=i=>{ let j=i; while(j<ms.length && !ms[j].bar.endStop && !ms[j].bar.bwd && !(j>i && ms[j].bar.endStart)) j++;
+    return (ms[j] && !(j>i && ms[j].bar.endStart) && (ms[j].bar.endStop||ms[j].bar.bwd))? j+1 : j; };
   while(i<ms.length && guard++<ms.length*8+50){
     const m=ms[i], bar=m.bar||{};
     if(bar.fwd) start=i;
     const p=passes[start]||1;
-    if(bar.endStart && !jumped && !bar.endStart.includes(p)){            // не наша вольта — пропускаем до её конца
-      let j=i; while(j<ms.length && !ms[j].bar.endStop && !(j>i && ms[j].bar.endStart)) j++;
-      i= (ms[j]&&ms[j].bar.endStop)? j+1 : j; continue;
+    if(bar.endStart){
+      const nx=voltaEnd(i);
+      // не наша вольта — пропускаем до её конца; после D.C./D.S. играем только последнюю вольту
+      const skip= jumped? !!(ms[nx]&&ms[nx].bar.endStart) : !bar.endStart.includes(p);
+      if(skip){ i=nx; continue; }
     }
     out.push(i);
     if(jumped && bar.fine) break;
     if(jumped && bar.tocoda){ const c=ms.findIndex((x,k)=>k>i && x.bar.coda); if(c>=0){ i=c; jumped='coda'; continue; } }
     if(bar.bwd && !jumped){
-      if(p<bar.bwd){ passes[start]=p+1; i=start; continue; }
+      // сколько раз играть: по «times» и по номерам вольт этой группы (|1 |2 |3 без явного times)
+      let times=bar.bwd; for(let k=start;k<=i;k++){ const e=ms[k].bar.endStart; if(e) times=Math.max(times,...e); }
+      let k=i+1; while(k<ms.length && ms[k].bar.endStart && !ms[k].bar.fwd){ times=Math.max(times,...ms[k].bar.endStart); k=voltaEnd(k); }
+      if(p<times){ passes[start]=p+1; i=start; continue; }
       passes[start]=1; start=i+1;
     }
     if(!jumped && bar.dacapo){ jumped='dc'; i=0; start=0; continue; }
@@ -1149,7 +1170,11 @@ function finishPiece(p){
   // звучащие ноты: лига сливает одинаковые соседние высоты
   measures.forEach(m=>m.events.forEach(ev=>{
     if(ev.rest){ ev.noteIdx=-1; prevSound= null; return; }
-    if(ev.tieStop && prevSound && prevSound.midi===ev.midi && prevSound.tieOpen){ prevSound.q+=ev.q; prevSound.heads.push(ev); ev.noteIdx=prevSound.i; prevSound.tieOpen=ev.tieStart; return; }
+    if(ev.tieStop){
+      if(prevSound && prevSound.midi===ev.midi && prevSound.tieOpen){ prevSound.q+=ev.q; prevSound.heads.push(ev); ev.noteIdx=prevSound.i; prevSound.tieOpen=ev.tieStart; return; }
+      ev.tieStop=false;                                      // «лига» к другой высоте (ошибка файла) — рисуем обычную ноту
+      if(prevSound && prevSound.tieOpen){ prevSound.heads[prevSound.heads.length-1].tieStart=false; prevSound.tieOpen=false; }
+    }
     const n={i:notes.length, midi:ev.midi, letter:ev.letter, alter:ev.alter, oct:ev.oct, step:ev.step, q:ev.q, heads:[ev], m:ev.m, pos:ev.pos, tieOpen:ev.tieStart, ru:ruName(ev.letter,ev.alter), lyric:ev.lyric};
     const f=fingering(n.midi, ev.str, ev.fing); n.fing=f; n.fingShort= f? f.short : '—'; n.how= f? f.text : 'выше первой позиции';
     ev.noteIdx=n.i; notes.push(n); prevSound=n;
@@ -1173,9 +1198,9 @@ function sniff(bytes, name){
   const head=String.fromCharCode(...b.subarray(0,Math.min(4,b.length)));
   if(head==='PK\x03\x04') return 'mxl';
   if(head==='MThd' || head==='RIFF') return 'midi';
-  const txt=decodeText(bytes).trimStart();
+  const txt=normText(decodeText(bytes));
   if(/^<\?xml|^<score-partwise|^<score-timewise|^<!DOCTYPE score/i.test(txt) || /<score-(partwise|timewise)/.test(txt.slice(0,3000))) return 'musicxml';
-  if(/^X:\s*\d+/m.test(txt) && /^K:/m.test(txt)) return 'abc';
+  if(isABC(txt)) return 'abc';
   if(/\.(abc)$/i.test(name||'')) return 'abc';
   return 'text';
 }
@@ -1190,10 +1215,12 @@ async function parseAny(bytes, name, opts){
   p.kind=kind; p.fileName=name||'';
   return finishPiece(p);
 }
+function normText(text){ return text.replace(/\r\n?/g,'\n').split('\n').map(l=>l.replace(/^[ \t]+/,'')).join('\n').trim(); }
+function isABC(t){ return /^K:/m.test(t) && /^(X:\s*\d+|L:\s*\d+\/\d+)/m.test(t); }
 function parseText(text){
-  const t=text.trim();
+  const t=normText(text);
   let p;
-  if(/^X:\s*\d+/m.test(t) && /^K:/m.test(t)) p=parseABC(t,'');
+  if(isABC(t)) p=parseABC(t,'');
   else if(/<score-(partwise|timewise)/.test(t)) p=parseMusicXML(t,'');
   else p=parseSimple(t);
   return finishPiece(p);
@@ -1216,7 +1243,7 @@ function noteWidth(ev){                        // ширина места под
   const q=ev.q;
   let w= q>=4? 56 : q>=2? 46 : q>=1? 38 : q>=0.5? 29 : q>=0.25? 23 : 20;
   if(ev.dots) w+=5;
-  if(ev.showAcc) w+=11;
+  if(ev.showAcc!=null) w+=11;
   if(SHOW_LYR && ev.lyric){ const lw=ev.lyric.length*6.6+6; if(lw>w) w=lw; }
   return w;
 }
@@ -1230,8 +1257,9 @@ function markAccidentals(piece){
     m.events.forEach(ev=>{
       if(ev.rest){ ev.showAcc=null; return; }
       const k=ev.letter+ev.oct, cur= state[k]!=null? state[k] : (ka[ev.letter]||0);
-      if(ev.alter!==cur && !(ev.tieStop && ev.pos===0)){ ev.showAcc=ev.alter; } else ev.showAcc=null;
-      state[k]=ev.alter;
+      const tiedIn= ev.tieStop && ev.pos===0;               // нота, залигованная из прошлого такта: без знака и не «помнится»
+      if(ev.alter!==cur && !tiedIn){ ev.showAcc=ev.alter; } else ev.showAcc=null;
+      if(!tiedIn) state[k]=ev.alter;
     });
   });
 }
@@ -1258,8 +1286,11 @@ function render(){
   layout={rows:[], evPos:new Map(), W, LW};
   rows.forEach((idxs,ri)=>{
     const first=ri===0;
-    const low=Math.min(28,...idxs.flatMap(i=>piece.measures[i].events.filter(e=>!e.rest).map(e=>e.step)));
-    const extraLow=Math.max(0, Math.round(yOf(low)+14-(TOP+STAFF+22)));
+    let yTop=TOP, yBot=TOP+STAFF;
+    idxs.forEach(i=>{ const m=piece.measures[i], {inGroup}=beamGroups(m); m.events.forEach(ev=>{ if(ev.rest) return; const y=yOf(ev.step), up=stemUp(ev,inGroup), st= ev.type==='w'? 0 : GAP*3.4+6;
+      yTop=Math.min(yTop, y-8-(up? st : 0)); yBot=Math.max(yBot, y+8+(up? 0 : st)); }); });
+    const extraHigh=Math.max(0, Math.round(FING_Y+8-yTop));            // высокие ноты и штили вверх — строка растёт вверх
+    const extraLow=Math.max(0, Math.round(yBot+6-(TOP+STAFF+22)));
     const nameY=TOP+STAFF+22+extraLow+12, lyrY=nameY+(hasNames?14:0);
     const H= hasLyr? lyrY+6 : hasNames? nameY+6 : TOP+STAFF+22+extraLow;
     const svg=document.createElementNS(SVGNS,'svg');
@@ -1271,8 +1302,8 @@ function render(){
     const last=ri===rows.length-1;
     let scale= avail/nat; if(last && scale>1.35) scale=1.35; if(scale<0.6) scale=0.6;
     const VW=Math.max(LW, headSum+nat*scale+10);
-    svg.setAttribute('viewBox',`0 0 ${VW} ${H}`);
-    svg.setAttribute('width',W); svg.setAttribute('height',Math.round(H*W/VW));
+    svg.setAttribute('viewBox',`0 ${-extraHigh} ${VW} ${H+extraHigh}`);
+    svg.setAttribute('width',W); svg.setAttribute('height',Math.round((H+extraHigh)*W/VW));
     const row={svg, measures:[], H, VW, idx:ri};
     const endX=headSum+nat*scale+6;
     LINE_STEPS.forEach(s=>add('line',{x1:4,x2:endX,y1:yOf(s),y2:yOf(s),class:'staffline'}));
@@ -1291,8 +1322,8 @@ function render(){
       const mx0=x;
       const mw=natural[mi]*scale;
       // зона такта: нажатие — отрывок; подсветка отрывка
-      add('rect',{x:mx0-2,y:0,width:mw+4,height:H,class:'mloop','data-mloop':mi}).style.display='none';
-      if(ri===0&&k===0 || k===0 || true){ if(k===0 || m.num!=null) add('text',{x:mx0+1,y:TOP-14,class:'mnum'}, k===0? m.num : ''); }
+      add('rect',{x:mx0-2,y:-extraHigh,width:mw+4,height:H+extraHigh,class:'mloop','data-mloop':mi}).style.display='none';
+      if(k===0) add('text',{x:mx0+1,y:TOP-14-extraHigh,class:'mnum'}, m.num);
       // события такта
       let cx=mx0+6; const placed=[];
       m.events.forEach(ev=>{
@@ -1303,11 +1334,11 @@ function render(){
         layout.evPos.set(ev,{row:ri,x:hx,sx:cx,w,svg});
         cx+=w;
       });
-      drawMeasureEvents(add, svg, m, placed, {lyrY, nameY, H});
+      drawMeasureEvents(add, svg, m, placed, {lyrY, nameY, H, eh:extraHigh});
       x=mx0+mw+8;
       add('line',{x1:x,x2:x,y1:yOf(38),y2:yOf(30),class:'bar'+(m.final||mi===piece.measures.length-1?' final':'')});
       if(m.final||mi===piece.measures.length-1) add('line',{x1:x-4,x2:x-4,y1:yOf(38),y2:yOf(30),class:'bar'});
-      add('rect',{x:x0,y:0,width:x+6-x0,height:H,class:'mhit','data-m':mi});
+      add('rect',{x:x0,y:-extraHigh,width:x+6-x0,height:H+extraHigh,class:'mhit','data-m':mi});
       row.measures.push({mi,x0:mx0-2,x1:x+2});
       x+=6;
     });
@@ -1317,22 +1348,27 @@ function render(){
   paintLoop(); paint();
 }
 
-function drawMeasureEvents(add, svg, m, placed, ctx){
-  // группы для рёбер: подряд идущие ноты короче четверти внутри одной доли
+// группы для рёбер: подряд идущие ноты короче четверти внутри одной доли (в 6/8 — доля в три восьмых)
+function beamGroups(m){
   const compound= m.beatType===8 && m.beats%3===0;
   const beat= compound? 1.5 : (m.beatType===2? 1 : 4/m.beatType);
   const groups=[]; let g=null;
-  placed.forEach(p=>{
-    const ev=p.ev;
+  m.events.forEach(ev=>{
     const beamable=!ev.rest && ev.q<1 && ev.type!=='q';
     const b0=Math.floor(ev.pos/beat+1e-6);
-    if(beamable && g && g.beat===b0){ g.list.push(p); }
-    else { g= beamable? {beat:b0,list:[p]} : null; if(g) groups.push(g); }
+    if(beamable && g && g.beat===b0){ g.list.push(ev); }
+    else { g= beamable? {beat:b0,list:[ev]} : null; if(g) groups.push(g); }
   });
-  const inGroup=new Map(); groups.forEach(gr=>{ if(gr.list.length>1) gr.list.forEach(p=>inGroup.set(p.ev,gr)); });
-  // направление штилей групп
-  groups.forEach(gr=>{ if(gr.list.length<2) return; const avg=gr.list.reduce((s,p)=>s+p.ev.step,0)/gr.list.length; gr.up=avg<34;
-    const ys=gr.list.map(p=>yOf(p.ev.step)); gr.beamY= gr.up? Math.min(...ys)-3.3*GAP : Math.max(...ys)+3.3*GAP; });
+  const inGroup=new Map();
+  groups.forEach(gr=>{ if(gr.list.length<2) return; const avg=gr.list.reduce((s,e)=>s+e.step,0)/gr.list.length; gr.up=avg<34;
+    const ys=gr.list.map(e=>yOf(e.step)); gr.beamY= gr.up? Math.min(...ys)-3.3*GAP : Math.max(...ys)+3.3*GAP; gr.list.forEach(e=>inGroup.set(e,gr)); });
+  return {groups, inGroup};
+}
+function stemUp(ev, inGroup){ const gr=inGroup.get(ev); return gr? gr.up : ev.step<34; }
+
+function drawMeasureEvents(add, svg, m, placed, ctx){
+  const {groups, inGroup}=beamGroups(m);
+  const placedOf=new Map(placed.map(p=>[p.ev,p]));
   placed.forEach((p,k)=>{
     const ev=p.ev, gr=inGroup.get(ev);
     const gEl=document.createElementNS(SVGNS,'g');
@@ -1340,7 +1376,7 @@ function drawMeasureEvents(add, svg, m, placed, ctx){
     if(ev.rest) gEl.setAttribute('data-rest','1');
     svg.appendChild(gEl);
     const put=(tag,attrs,text)=>add(tag,attrs,text,gEl);
-    put('rect',{x:p.sx+1,y:3,width:p.w-2,height:ctx.H-6,rx:8,class:'hl'});
+    put('rect',{x:p.sx+1,y:3-ctx.eh,width:p.w-2,height:ctx.H+ctx.eh-6,rx:8,class:'hl'});
     if(ev.rest){ drawRest(put, ev, p.x-4); if(ev.tuplet) put('text',{x:p.x,y:yOf(40),class:'tup'},ev.tuplet); return; }
     const x=p.x, y=yOf(ev.step);
     const lw=Math.min(13,p.w*0.3);
@@ -1369,8 +1405,8 @@ function drawMeasureEvents(add, svg, m, placed, ctx){
       }
     }
     if(ev.dots){ const dy=(ev.step%2===0)? y-GAP/2+1 : y; for(let d=0;d<ev.dots;d++) put('circle',{cx:x+12+d*5,cy:dy,r:2.2,class:'nh'}); }
-    if(ev.tuplet && (!gr || gr.list[0]===p)) put('text',{x: gr? (gr.list[0].x+gr.list[gr.list.length-1].x)/2 : x, y: up? Math.min(yOf(ev.step)-GAP*3.4, gr?gr.beamY:1e9)-6 : yOf(ev.step)+GAP*3.4+12, class:'tup'}, ev.tuplet);
-    if(SHOW_FING && ev.noteIdx>=0 && !ev.tieStop){ const n=piece.notes[ev.noteIdx]; put('text',{x,y:FING_Y,class:'fing'}, n.fingShort); }
+    if(ev.tuplet && (!gr || gr.list[0]===ev)) put('text',{x: gr? (placedOf.get(gr.list[0]).x+placedOf.get(gr.list[gr.list.length-1]).x)/2 : x, y: up? Math.min(yOf(ev.step)-GAP*3.4, gr?gr.beamY:1e9)-6 : yOf(ev.step)+GAP*3.4+12, class:'tup'}, ev.tuplet);
+    if(SHOW_FING && ev.noteIdx>=0 && !ev.tieStop){ const n=piece.notes[ev.noteIdx]; put('text',{x,y:FING_Y-ctx.eh,class:'fing'}, n.fingShort); }
     if(SHOW_LYR && ev.lyric) put('text',{x,y:ctx.lyrY,class:'lyr'},ev.lyric);
     if(SHOW_NAMES && ev.noteIdx>=0 && !ev.tieStop){ const n=piece.notes[ev.noteIdx]; put('text',{x,y:ctx.nameY,class:'lyr nm'}, n.ru.replace('-диез','♯').replace('-бемоль','♭').replace('дубль-','')); }
     arrows.forEach(([c,d])=>put('path',{d,class:'arr '+c}));
@@ -1387,14 +1423,14 @@ function drawMeasureEvents(add, svg, m, placed, ctx){
   groups.forEach(gr=>{
     if(gr.list.length<2) return;
     const g2=document.createElementNS(SVGNS,'g'); svg.appendChild(g2);
-    const xs=gr.list.map(p=>p.sx2), by=gr.beamY, dir= gr.up? 1 : -1, th=4.6;
+    const xs=gr.list.map(e=>placedOf.get(e).sx2), by=gr.beamY, dir= gr.up? 1 : -1, th=4.6;
     const seg=(xa,xb,level)=>{ const yy=by+dir*level*7.5; add('polygon',{points:`${xa},${yy} ${xb},${yy} ${xb},${yy+dir*th} ${xa},${yy+dir*th}`,class:'beam'},null,g2); };
     seg(xs[0]-0.8, xs[xs.length-1]+0.8, 0);
     const lvl=ev=> ev.type==='16'? 2 : ev.type==='32'? 3 : 1;
     for(let L=2;L<=3;L++){
       for(let i=0;i<gr.list.length;i++){
-        const e=gr.list[i].ev; if(lvl(e)<L) continue;
-        const prev=i>0 && lvl(gr.list[i-1].ev)>=L, next=i+1<gr.list.length && lvl(gr.list[i+1].ev)>=L;
+        const e=gr.list[i]; if(lvl(e)<L) continue;
+        const prev=i>0 && lvl(gr.list[i-1])>=L, next=i+1<gr.list.length && lvl(gr.list[i+1])>=L;
         if(next) seg(xs[i]-0.8, xs[i+1]+0.8, L-1);
         else if(!prev){ if(i>0) seg(xs[i]-9, xs[i]+0.8, L-1); else seg(xs[i]-0.8, xs[i]+9, L-1); }
       }
@@ -1432,11 +1468,12 @@ function scrollToCurrent(force){
   const top=box.scrollTop+row.getBoundingClientRect().top-box.getBoundingClientRect().top-(prev?prev.getBoundingClientRect().height:0)-4;
   box.scrollTo({top:Math.max(0,top),behavior:'smooth'});
 }
+function mName(mi){ const m=piece.measures[mi]; return m.num+(m.repeatPass? ' (повтор)' : ''); }
 function paintLoop(){
   document.querySelectorAll('#sheet rect.mloop').forEach(r=>{ const mi=+r.dataset.mloop; r.style.display= loop && mi>=loop.a && mi<=loop.b? '' : 'none'; });
   const chip=document.getElementById('loopChip');
   chip.hidden=!loop;
-  if(loop){ const a=piece.measures[loop.a].num, b=piece.measures[loop.b].num; document.getElementById('loopLab').textContent= a===b? a : a+'–'+b; }
+  if(loop){ document.getElementById('loopLab').textContent= loop.a===loop.b? mName(loop.a) : mName(loop.a)+'–'+mName(loop.b); }
 }
 function showPlayhead(ri, x){          // бегунок в режимах «Играть» и «Слушать»
   document.querySelectorAll('#sheet line.playhead').forEach(l=>{ const r=+l.dataset.ph; if(r===ri && x!=null){ l.style.display=''; l.setAttribute('x1',x); l.setAttribute('x2',x); } else l.style.display='none'; });
@@ -1507,8 +1544,8 @@ let loop=null;           // {a,b} — такты отрывка (индексы 
 const QUIET=0.2, RISE=3, QUIET_T=0.03, STOP_T=0.15, OTHER_T=0.3;   // секунды — по часам звука, не по кадрам
 let lastAccepted=-1, released=true, relPeak=0, relLow=-1, relQ0=-1, relS0=-1, floorLv=-1, floorT=0, otherMidi=-1, otherT=-1;
 
-function rangeStart(){ if(!loop) return 0; const i=piece.notes.findIndex(n=>n.m>=loop.a); return i<0? 0 : i; }
-function rangeEnd(){ if(!loop) return piece.notes.length-1; let e=-1; piece.notes.forEach((n,i)=>{ if(n.m<=loop.b) e=i; }); return e<0? piece.notes.length-1 : e; }
+function rangeStart(){ if(!loop) return 0; const i=piece.notes.findIndex(n=>n.m>=loop.a && n.m<=loop.b); return i<0? piece.notes.length : i; }
+function rangeEnd(){ if(!loop) return piece.notes.length-1; let e=-1; piece.notes.forEach((n,i)=>{ if(n.m>=loop.a && n.m<=loop.b) e=i; }); return e; }
 function clearStates(a,b){ for(let i=a;i<=b;i++){ const n=piece.notes[i]; n.state=''; n.cents=null; n.miss=null; n.wrong=[]; } }
 
 /* === определение высоты звука (MPM) — проверенный код, не трогать без регресс-теста === */
@@ -1633,6 +1670,7 @@ function loop_(){
   if(mode==='tempo'){ tempoFrame(p); return; }
   if(mode==='demo'){ demoFrame(p); return; }
   const target=piece.notes[idx];
+  if(mode==='mic' && ctx.currentTime<sampleMute){ showHeard(null,target); return; }   // только что звучал образец ноты — эхо не засчитываем
   if(mode==='mic') watchRelease(p, buf[0]===0 && buf[1]===0 && buf[2]===0);   // начало окна в нулях — микрофон только включился
 
   if(!p){
@@ -1724,7 +1762,7 @@ function advance(){
   idx++;
   if(idx>end){
     if(loop){                                      // отрывок: ещё раз с начала, пока не нажмут «Стоп»
-      if(accepted) flashOk('· ещё раз с такта '+piece.measures[loop.a].num);
+      if(accepted) flashOk('· ещё раз с такта '+mName(loop.a));
       idx=rangeStart(); clearStates(idx,end); stable.length=0;      // последнюю ноту ещё держат — заново её не засчитываем
       setStatus(''); paint(); updateTarget(); return;
     }
@@ -1759,26 +1797,31 @@ function tempoStart(){
   const a=rangeStart(), b=rangeEnd(), ms=measureStarts();
   const m0= loop? loop.a : 0, m1= loop? loop.b : piece.measures.length-1;
   const q0=ms[m0], q1=ms[m1+1];
-  const sq=spq(), beatQ=piece.beatQ, beatsIn=Math.max(2,Math.min(6,Math.round(piece.measures[m0].len/beatQ)||4));
-  const t0=ctx.currentTime+0.2+beatsIn*beatQ*sq;
+  const sq=spq(), beatQ=piece.beatQ, mm=piece.measures[m0], fullQ=mm.beats*4/mm.beatType;
+  const pickup= mm.len<fullQ-1e-6;                       // затакт: считаем полный такт, затакт звучит на его последних долях
+  const beatsIn=Math.max(2,Math.min(6,Math.round(fullQ/beatQ)||4));
+  const countStart=ctx.currentTime+0.2;
+  const t0=countStart+beatsIn*beatQ*sq-(pickup? mm.len*sq : 0);
   const starts=[], ends=[];
   for(let i=a;i<=b;i++){ const n=piece.notes[i]; const s=t0+(ms[n.m]+n.pos-q0)*sq; starts.push(s); ends.push(s+n.q*sq); }
   const tEnd=t0+(q1-q0)*sq;
-  tl={t0, tEnd, a, b, q0, ms, sq, starts, ends, frames:piece.notes.slice(a,b+1).map(()=>[]), judged:a-1, count:0, beatsIn};
+  tl={t0, countStart, tEnd, a, b, q0, ms, sq, starts, ends, frames:piece.notes.slice(a,b+1).map(()=>[]), judged:a-1, count:0, beatsIn};
+  if(metroBus){ try{metroBus.disconnect();}catch(e){} }
   metroBus=ctx.createGain(); metroBus.connect(ctx.destination);
-  for(let k=0;k<beatsIn;k++) tick(t0-(beatsIn-k)*beatQ*sq, k===0);
-  if(tempo.click){ for(let mi=m0; mi<=m1; mi++){ const m=piece.measures[mi]; const nb=Math.max(1,Math.round(m.len/beatQ)); for(let bb=0;bb<nb;bb++){ const t=t0+(ms[mi]-q0+bb*beatQ)*sq; if(t<tEnd-1e-3) tick(t, bb===0); } } }
+  for(let k=0;k<beatsIn;k++) tick(countStart+k*beatQ*sq, k===0);
+  if(tempo.click){ for(let mi=(pickup? m0+1 : m0); mi<=m1; mi++){ const m=piece.measures[mi]; const nb=Math.max(1,Math.round(m.len/beatQ)); for(let bb=0;bb<nb;bb++){ const t=t0+(ms[mi]-q0+bb*beatQ)*sq; if(t<tEnd-1e-3) tick(t, bb===0); } } }
 }
 function countPill(text){
   const el=document.getElementById('countPill'); el.textContent=text;
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
 }
 function tempoFrame(p){
+  if(!tl||tl.done) return;
   const now=ctx.currentTime;
   const mf=p? 69+12*Math.log2(p.freq/440) : null;
   if(now<tl.t0){                                       // счёт перед началом
     const beatSec=piece.beatQ*tl.sq;
-    const b=Math.floor((now-(tl.t0-tl.beatsIn*beatSec))/beatSec)+1;
+    const b=Math.floor((now-tl.countStart)/beatSec)+1;
     if(b>=1 && b!==tl.count){ tl.count=b; countPill('Приготовься · '+b); }
   } else {
     if(tl.count!=='go'){ tl.count='go'; countPill('Играй!'); setStatus('Играй вместе со щелчками. Ноты не ждут — ошибся, всё равно иди дальше.'); }
@@ -1810,8 +1853,8 @@ function finishTempo(){
   if(loop){                                            // отрывок — сразу ещё раз (со счётом)
     const r=summary(tl.a,tl.b);
     flashOk(`· чисто ${r.ok} из ${r.total} — ещё раз`);
-    const a=tl.a, b=tl.b;
-    setTimeout(()=>{ if(mode!=='tempo'||!running) return; clearStates(a,b); idx=a; paint(); updateTarget(); tempoStart(); },50);
+    const a=tl.a, b=tl.b; tl.done=true;
+    clearStates(a,b); idx=a; paint(); updateTarget(); tempoStart();
     return;
   }
   const a=tl.a, b=tl.b;
@@ -1822,7 +1865,9 @@ function finishTempo(){
 /* === демо: живая скрипка из библиотеки violin/ в тот же анализатор ===
    violin/long/ — долгие ноты без вибрато (Университет Айовы, mf), violin/short/ — короткие (spiccato, ldk1609, CC0). */
 const SHORT_MAX=0.3;                     // ноты короче — из short/
-let demoTimer=null, demoSrc=null, demoGain=null, demoMidi=null, demoT=null;
+let demoTimer=null, demoSrc=null, demoGain=null, demoMidi=null, demoT=null, demoReq=0, demoLoading=false;
+let sampleSrc=null, sampleReq=0, sampleMute=0;        // образец ноты по нажатию на неё
+function stopSample(){ sampleReq++; if(sampleSrc){ try{sampleSrc.stop()}catch(e){} sampleSrc=null; } }
 const noteCache={};
 function stopDemo(){
   if(demoTimer){clearTimeout(demoTimer);demoTimer=null;}
@@ -1858,16 +1903,22 @@ async function runDemo(){
   await ensureCtx();
   stop();
   const a=rangeStart(), b=rangeEnd();
-  clearStates(0,piece.notes.length-1); idx=a;
+  if(a>b){ setStatus('В отрывке нет нот — выбери другие такты.','warn'); return; }
+  const my=++demoReq; demoLoading=true; setStartBtn();
+  clearStates(0,piece.notes.length-1); idx=a; lastAccepted=-1; released=true; stable.length=0;
   setStatus('Готовлю звук скрипки…');
   const sq=spq();
   try{
     for(let i=a;i<=b;i++){ const n=piece.notes[i]; await loadNote('long',n.midi); if(n.q*sq<=SHORT_MAX) await loadNote('short',n.midi); }
   }catch(e){
+    if(my!==demoReq) return;
+    demoLoading=false; setStartBtn();
     setStatus('Звук скрипки не загрузился: '+e.message+'. На компьютере демо работает через «Запустить.command».','bad');
     return;
   }
-  if(screenNow!=='play'){ setStatus(''); return; }
+  demoLoading=false;
+  if(my!==demoReq) return;                             // пока грузился звук, нажали «Стоп» или другой режим
+  if(screenNow!=='play'){ setStatus(''); setStartBtn(); return; }
   mode='demo'; running=true;
   setStartBtn();
   setStatus('Слушай и смотри: какие ноты, какие пальцы.');
@@ -1888,7 +1939,7 @@ async function runDemo(){
     const gapQ= i>a && prev? (ms[target.m]+target.pos)-(ms[prev.m]+prev.pos+prev.q) : 0;
     const dir=secs<=SHORT_MAX? 'short' : 'long';
     const s=await loadNote(dir,target.midi);
-    if(!running||mode!=='demo') return;
+    if(!running||mode!=='demo'||my!==demoReq) return;
     const want=440*Math.pow(2,(target.midi-69)/12);
     const rateAt=bt=>{ const k=Math.min(s.cents.length-1, Math.max(0, Math.round(bt/s.step))); return Math.pow(2,-s.cents[k]/1200); };
     const whole=(s.buf.duration-s.start)*s.f/want;
@@ -1935,7 +1986,7 @@ function paintArrow(){
 }
 
 function showHeard(h,target){
-  const hf= h? 69+12*Math.log2(h.freq/440) : null, mf= h && !holding(hf)? hf : null;
+  const hf= h? 69+12*Math.log2(h.freq/440) : null, mf= h && !(mode==='mic' && holding(hf))? hf : null;
   drawBoard(target, mf); noteArrow(target, mf);
   const hn=document.getElementById('heardNote'), hi=document.getElementById('heardInfo');
   const nd=document.getElementById('needle');
@@ -1998,14 +2049,16 @@ async function openMic(){
 }
 async function start(){
   if(!piece) return;
+  stopSample();
+  if(rangeStart()>rangeEnd()){ setStatus('В отрывке нет нот — выбери другие такты.','warn'); return; }
   const err=await openMic(); if(err==='cancel') return; if(err){ setStatus(err,'bad'); return; }
   if(screenNow!=='play'){ stop(); return; }
   const a=rangeStart(), b=rangeEnd();
   if(uiMode==='play'){                              // в темпе — всегда с начала (отрывка), после счёта
-    clearStates(0,piece.notes.length-1); idx=a; mode='tempo'; running=true; tempoStart();
+    clearStates(0,piece.notes.length-1); idx=a; lastAccepted=-1; released=true; stable.length=0; mode='tempo'; running=true; tempoStart();
     setStatus(`Слушай счёт: ${tl.beatsIn} щелчка — и начинай с первой ноты.`);
   } else {
-    if(idx>b || idx<a || piece.notes.slice(a,b+1).every(n=>n.state)){ clearStates(a,b); idx=a; }   // сыграно до конца — сначала
+    if(idx>b || idx<a){ clearStates(a,b); idx=a; } else clearStates(idx,b);   // сыграно до конца — сначала; иначе — с текущей (или нажатой) ноты
     mode='mic'; running=true; lastAccepted=-1; released=true; stable.length=0;
     document.getElementById('btnSkip').disabled=false;
     setStatus('Слушаю. Играй первую ноту.');
@@ -2016,7 +2069,7 @@ async function start(){
 }
 
 function stop(){
-  running=false; mode=null; tl=null; micReq++;
+  running=false; mode=null; tl=null; micReq++; demoReq++; demoLoading=false; stopSample();
   if(metroBus){ try{metroBus.disconnect();}catch(e){} metroBus=null; }
   if(micSrc){ try{micSrc.disconnect();}catch(e){} micSrc=null; }
   if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
@@ -2242,8 +2295,8 @@ function openPiece(entry){
   let p;
   try{ p= entry.src? finishPiece(JSON.parse(JSON.stringify(entry.src))) : parseText(entry.text); }
   catch(e){ alert('Не получилось открыть ноты: '+e.message); return; }
-  stop();
-  piece=p; pieceEntry=entry; loop=null; idx=0;
+  stop(); setSelecting(0);
+  piece=p; pieceEntry=entry; loop=null; idx=0; lastAccepted=-1; released=true; stable.length=0;
   piece.notes.forEach(n=>{ n.state=''; n.cents=null; n.miss=null; n.wrong=[]; });
   piece.places=[...new Set(piece.notes.filter(n=>n.fing).map(n=>n.fing.str+':'+n.fing.d))];
   const pr=progress[entry.id]||{};
@@ -2277,7 +2330,7 @@ function setUiMode(m, silent){
 }
 function setStartBtn(){
   const b=document.getElementById('btnStart');
-  if(running && mode!=='tune'){ b.textContent='Стоп'; b.classList.add('stop'); }
+  if((running && mode!=='tune') || demoLoading){ b.textContent='Стоп'; b.classList.add('stop'); }
   else { b.textContent= uiMode==='listen'? '▶ Слушать' : 'Начать'; b.classList.remove('stop'); }
 }
 document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{ if(uiMode===b.dataset.mode) return; stop(); setUiMode(b.dataset.mode); if(piece){ clearStates(0,piece.notes.length-1); idx=rangeStart(); paint(); updateTarget(); } });
@@ -2292,13 +2345,13 @@ function showResult(a,b,kind){
   pr.bpm=tempo.bpm; progress[pieceEntry.id]=pr; saveProgress();
   document.getElementById('resTitle').textContent= r.stars===3? 'Отлично!' : r.stars===2? 'Хорошо!' : r.stars===1? 'Неплохо' : 'Готово';
   document.getElementById('resStars').className='rstars s'+r.stars;
-  const nums=[`<span><b>${r.ok}</b>из ${r.total} чисто</span>`];
+  const nums=[`<span><b>${r.ok}</b>из ${r.total} ${kind==='play'? 'чисто' : 'с первого раза'}</span>`];
   if(kind==='play'){ if(r.hi) nums.push(`<span><b>${r.hi}</b>высоко</span>`); if(r.lo) nums.push(`<span><b>${r.lo}</b>низко</span>`); if(r.miss) nums.push(`<span><b>${r.miss}</b>не услышал</span>`); }
-  else { if(r.mid+r.bad) nums.push(`<span><b>${r.mid+r.bad}</b>не с первого раза</span>`); if(r.skip) nums.push(`<span><b>${r.skip}</b>пропущено</span>`); }
+  else { if(r.mid+r.bad) nums.push(`<span><b>${r.mid+r.bad}</b>поправлены</span>`); if(r.skip) nums.push(`<span><b>${r.skip}</b>пропущено</span>`); }
   document.getElementById('resNums').innerHTML=nums.join('');
   const tr=r.trouble;
-  const names=tr.map(mi=>piece.measures[mi].num);
-  document.getElementById('resTrouble').textContent= tr.length? (tr.length===r.total? '' : 'Потренируй '+(tr.length===1?'такт ':'такты ')+names.join(', ')+'.') : 'Все ноты чисто — можно быстрее или следующую мелодию.';
+  const names=[...new Set(tr.map(mName))], nMeas=new Set(piece.notes.slice(a,b+1).map(n=>n.m)).size;
+  document.getElementById('resTrouble').textContent= tr.length? (tr.length>=nMeas? '' : 'Потренируй '+(tr.length===1?'такт ':'такты ')+names.join(', ')+'.') : 'Все ноты чисто — можно быстрее или следующую мелодию.';
   document.getElementById('resLoop').hidden=!tr.length;
   document.getElementById('resSlower').hidden= kind!=='play' || tempo.bpm<=30;
   document.getElementById('result').hidden=false;
@@ -2310,14 +2363,13 @@ document.getElementById('resSlower').onclick=()=>{ hideResult(); setBpm(tempo.bp
 document.getElementById('resHome').onclick=()=>{ hideResult(); stop(); showScreen('home'); };
 document.getElementById('resLoop').onclick=()=>{
   hideResult(); const r=summary(lastRange.a,lastRange.b); if(!r.trouble.length) return;
-  setLoop(r.trouble[0], r.trouble[Math.min(r.trouble.length-1, 1)]);     // первые один-два трудных такта
+  const t=r.trouble; setLoop(t[0], t[1]===t[0]+1? t[1] : t[0]);          // первый трудный такт и следующий, если он тоже трудный
   if(uiMode==='listen') runDemo(); else start();
 };
 
 /* === нажатие на ноту: услышать её, увидеть палец, начать с неё === */
-let sampleSrc=null;
 async function playSample(midi, secs){
-  try{ await ensureCtx(); const s=await loadNote('long',midi); const want=440*Math.pow(2,(midi-69)/12);
+  try{ await ensureCtx(); const my=++sampleReq; const s=await loadNote('long',midi); if(my!==sampleReq) return; const want=440*Math.pow(2,(midi-69)/12);
     const whole=(s.buf.duration-s.start)*s.f/want, hold=Math.min(whole,secs||1.2);
     if(sampleSrc){ try{sampleSrc.stop()}catch(e){} }
     const src=ctx.createBufferSource(), g=ctx.createGain(), t0=ctx.currentTime+0.01; src.buffer=s.buf;
@@ -2325,6 +2377,7 @@ async function playSample(midi, secs){
       if(k===0) src.playbackRate.setValueAtTime(r,t0); else src.playbackRate.linearRampToValueAtTime(r,t0+k*s.step); }
     g.gain.setValueAtTime(1,t0); if(hold<whole-0.05){ g.gain.setValueAtTime(1,t0+hold); g.gain.setTargetAtTime(0,t0+hold,0.05); }
     src.connect(g); g.connect(ctx.destination); src.start(t0,s.start); src.stop(t0+Math.min(whole,hold+0.4)); sampleSrc=src;
+    sampleMute=t0+Math.min(whole,hold+0.4)+0.15;        // микрофон слышит динамик — образец не засчитываем
   }catch(e){}
 }
 function noteTap(i){
@@ -2335,7 +2388,8 @@ function noteTap(i){
   const c= n.cents!=null? ` (${n.cents>0?'+':''}${n.cents} ц)` : '';
   const what= n.state==='ok'? '✓ чисто'+c : n.state==='hi'? 'высоко'+c : n.state==='lo'? 'низко'+c : n.state==='miss'? 'не услышал'
             : n.state==='mid'||n.state==='bad'? 'взята не с первого раза'+c : n.state==='skip'? 'пропущена' : '';
-  setStatus(`${n.ru} — ${n.how}${what? ' · '+what : ''}. «Начать» — играть с этой ноты.`, n.state==='ok'?'ok':(n.state==='hi'||n.state==='lo')?'warn':'');
+  const tail= uiMode==='learn'? ' «Начать» — играть с этой ноты.' : uiMode==='play'? ' «Начать» — сыграть с начала, в темпе.' : ' «▶ Слушать» — послушать с начала.';
+  setStatus(`${n.ru} — ${n.how}${what? ' · '+what : ''}.`+tail, n.state==='ok'?'ok':(n.state==='hi'||n.state==='lo')?'warn':'');
   playSample(n.midi, Math.min(2, Math.max(0.8, n.q*spq())));
 }
 
@@ -2347,18 +2401,20 @@ function setSelecting(v){
   if(v===1) setStatus('Нажми на первый такт отрывка.'); else if(v===2) setStatus('Теперь нажми на последний такт отрывка.');
 }
 function setLoop(a,b){
+  if(a!=null){ const lo=Math.min(a,b), hi=Math.max(a,b); if(!piece.notes.some(n=>n.m>=lo&&n.m<=hi)){ setStatus('В этих тактах нет нот — выбери другие.','warn'); return false; } }
   stop();
   loop= a==null? null : {a:Math.min(a,b), b:Math.max(a,b)};
   clearStates(0,piece.notes.length-1); idx=rangeStart();
   paintLoop(); paint(); updateTarget(); scrollToCurrent(true);
-  setStatus(loop? `Отрывок: такты ${piece.measures[loop.a].num}–${piece.measures[loop.b].num}. Нажми на другой такт, чтобы расширить, или на крестик — убрать.` : '');
+  setStatus(loop? `Отрывок: ${loop.a===loop.b? 'такт '+mName(loop.a) : 'такты '+mName(loop.a)+'–'+mName(loop.b)}. «Начать» — играть только его, крестик — убрать.` : '');
+  return true;
 }
 document.getElementById('sheet').addEventListener('click',e=>{
   if(selecting){
     const hit=e.target.closest('rect.mhit'); if(!hit) return;
     const mi=+hit.dataset.m;
-    if(selecting===1){ setLoop(mi,mi); setSelecting(2); setStatus('Теперь нажми на последний такт отрывка (или «Начать», если нужен один такт).'); }
-    else { setLoop(loop? loop.a : mi, mi); setSelecting(0); }
+    if(selecting===1){ if(setLoop(mi,mi)){ setSelecting(2); setStatus('Теперь нажми на последний такт отрывка (или «Начать», если нужен один такт).'); } }
+    else { if(setLoop(loop? loop.a : mi, mi)) setSelecting(0); }
     return;
   }
   const g=e.target.closest('g[data-i]'); if(g && +g.dataset.i>=0){ noteTap(+g.dataset.i); }
@@ -2370,7 +2426,7 @@ document.getElementById('loopClear').onclick=()=>{ setSelecting(0); setLoop(null
 document.getElementById('btnStart').onclick=()=>{ if(selecting) setSelecting(0); if(running){ stop(); setStatus(''); return; } if(uiMode==='listen') runDemo(); else start(); };
 document.getElementById('btnReset').onclick=()=>{ stop(); clearStates(0,piece.notes.length-1); idx=rangeStart(); setStatus(''); paint(); updateTarget(); scrollToCurrent(true); };
 document.getElementById('btnSkip').onclick=()=>{ if(!piece||!running||mode!=='mic') return; piece.notes[idx].state='skip'; advance(); };
-document.getElementById('btnBack').onclick=()=>{ stop(); showScreen('home'); };
+document.getElementById('btnBack').onclick=()=>{ stop(); setSelecting(0); showScreen('home'); };
 document.getElementById('btnTune').onclick=()=>openTuner('home');
 document.getElementById('btnTune2').onclick=()=>openTuner('play');
 document.getElementById('btnHelp').onclick=document.getElementById('btnHelp2').onclick=()=>{ document.getElementById('help').hidden=false; };
@@ -2419,6 +2475,9 @@ tempo.click=store.get('click',true);
 
 /* === загрузка своих нот === */
 const loadDlg=document.getElementById('loadDlg'), fileIn=document.getElementById('fileIn');
+// на iPad список допустимых типов делает файлы серыми в «Файлах» — там выбираем без фильтра, формат узнаём по содержимому
+if(!IOS) fileIn.accept='.xml,.musicxml,.mxl,.mid,.midi,.abc,.txt,text/xml,application/xml,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,audio/midi,audio/x-midi,audio/mid,text/plain';
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}   // Safari: не стирать свои ноты через 7 дней
 function openLoad(tab){
   loadDlg.hidden=false; setTab(tab||'file');
   document.getElementById('loadErr').textContent=''; document.getElementById('loadInfo').hidden=true;
@@ -2470,6 +2529,7 @@ function describe(p){
   if(strs.length) bits.push('струны '+strs.join(', '));
   if(!p.firstPosition) bits.push('есть ноты выше 1-й позиции');
   if(p.kind==='musicxml' && p.partsCount>1) bits.push('партия: '+(p.partName||'первая'));
+  if(p.kind==='midi' && p.alternatives) bits.push('трек: '+p.alternatives[p.trackIdx||0].label);
   return bits.join(' · ');
 }
 function showAdded({entry,p}){
@@ -2480,7 +2540,7 @@ function showAdded({entry,p}){
   if(!p.firstPosition) warn.push('часть нот выше первой позиции — пальцы для них не показываются');
   const alts=p.alternatives;
   info.innerHTML=`<b>«${esc(entry.title)}»</b> добавлена: ${esc(entry.sub)}.${warn.length? '<br>'+esc(warn.join(' '))+'.' : ''}`+
-    (alts? `<div class="opts" style="margin-top:8px"><label><span class="lt">${alts[0].kind==='part'?'Партия:':'Трек:'}</span><select class="sel" id="altSel">${alts.map(a=>`<option value="${esc(String(a.key))}" ${String(a.key)===String(alts[0].kind==='part'? p.partId : 0)?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label></div>` : '')+
+    (alts? `<div class="opts" style="margin-top:8px"><label><span class="lt">${alts[0].kind==='part'?'Партия:':'Трек:'}</span><select class="sel" id="altSel">${alts.map(a=>`<option value="${esc(String(a.key))}" ${String(a.key)===String(alts[0].kind==='part'? p.partId : (p.trackIdx||0))?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label></div>` : '')+
     `<div class="btns" style="margin-top:8px"><button class="act" id="openAdded">Открыть</button></div>`;
   document.getElementById('openAdded').onclick=()=>{ loadDlg.hidden=true; openPiece(entry); };
   const sel=document.getElementById('altSel');
