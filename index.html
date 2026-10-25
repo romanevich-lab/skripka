@@ -173,7 +173,9 @@
   .n-ok .nh,.n-ok .nh.hollow{fill:var(--ok);stroke:var(--ok)} .n-ok .stem{stroke:var(--ok)} .n-ok .acc,.n-ok .flag{fill:var(--ok)}
   .n-mid .nh,.n-mid .nh.hollow{fill:var(--warn);stroke:var(--warn)} .n-mid .stem{stroke:var(--warn)} .n-mid .acc,.n-mid .flag{fill:var(--warn)}
   .n-bad .nh,.n-bad .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-bad .stem{stroke:var(--bad)} .n-bad .acc,.n-bad .flag{fill:var(--bad)}
-  .n-hi .hl{fill:var(--bad);opacity:.22} .n-lo .hl{fill:var(--low);opacity:.24} .n-miss .hl{fill:var(--muted);opacity:.2} .n-skip .hl{fill:var(--muted);opacity:.14}
+  .n-hi .hl,.n-wrong .hl{fill:var(--bad);opacity:.22} .n-lo .hl{fill:var(--low);opacity:.24} .n-miss .hl{fill:var(--muted);opacity:.2} .n-skip .hl{fill:var(--muted);opacity:.14}
+  .n-wrong .nh,.n-wrong .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-wrong .stem{stroke:var(--bad)} .n-wrong .acc,.n-wrong .flag{fill:var(--bad)}
+  .ghost{fill:var(--bad);stroke:var(--card);stroke-width:1.5}
   .n-hi .nh,.n-hi .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-hi .stem{stroke:var(--bad)} .n-hi .acc,.n-hi .flag{fill:var(--bad)}
   .n-lo .nh,.n-lo .nh.hollow{fill:var(--low);stroke:var(--low)} .n-lo .stem{stroke:var(--low)} .n-lo .acc,.n-lo .flag{fill:var(--low)}
   .n-miss .nh,.n-miss .nh.hollow{fill:var(--muted);stroke:var(--muted)} .n-miss .stem{stroke:var(--muted)} .n-miss .acc,.n-miss .flag{fill:var(--muted)}
@@ -323,7 +325,7 @@
       <div class="hbtns"><button class="pick" id="btnTune2">Настроить скрипку</button><button class="pick q" id="btnHelp2" aria-label="как это работает">?</button></div>
     </header>
     <div class="modes" id="modes">
-      <button data-mode="listen">▶ Слушать</button><button data-mode="learn" class="on">Учить</button><button data-mode="play">Играть</button>
+      <button data-mode="listen">▶ Слушать</button><button data-mode="learn" class="on">Учить</button><button data-mode="free">Играть</button><button data-mode="play">В темпе</button>
     </div>
 
     <div class="playrow">
@@ -377,7 +379,7 @@
           <span><i style="background:var(--ok)"></i>чисто</span>
           <span><i style="background:var(--bad)"></i>высоко</span>
           <span><i style="background:var(--low)"></i>низко</span>
-          <span><i style="background:var(--muted)"></i>не услышал</span>
+          <span><i style="background:var(--bad);box-shadow:inset 0 0 0 2px var(--card)"></i><span id="legWrong">не та нота (точка рядом — что услышала) · </span><i style="background:var(--muted)"></i><span id="legMiss">не услышал</span></span>
         </div>
         <div class="sep"></div>
         <div class="opts">
@@ -432,7 +434,8 @@
     <h2>Как это работает</h2>
     <p><b>Слушать</b> — настоящая скрипка играет мелодию, ноты подсвечиваются. Сначала послушай, потом играй сам.</p>
     <p><b>Учить</b> — программа ждёт каждую ноту сколько нужно и идёт дальше, только когда нота взята чисто. Снизу — какой палец и какая струна, на грифе — куда ставить палец; стрелка на ноте показывает, выше или ниже ты играешь.</p>
-    <p><b>Играть</b> — ноты идут сами в выбранном темпе (сначала счёт), каждая окрашивается: зелёная — чисто, красная — высоко, фиолетовая — низко, серая — не услышал. В конце — «Готово!», цветные ноты остаются на экране; звёзды за мелодию видны в списке.</p>
+    <p><b>Играть</b> — темпа нет: играешь как играется, программа идёт за тобой и красит каждую ноту: зелёная — чисто, красная — высоко, фиолетовая — низко, красная с точкой рядом — не та нота (точка показывает, что услышала), серая — пропущена. Не ждёт и не останавливает. В конце — «Готово!» и в каких тактах было не так.</p>
+    <p><b>В темпе</b> — ноты идут сами в выбранном темпе (сначала счёт), каждая окрашивается так же. Звёзды за мелодию видны в списке.</p>
     <p><b>Нажми на любую ноту</b> — услышишь, как она звучит, увидишь палец и струну; «Начать» пойдёт с неё.</p>
     <p><b>Отрывок:</b> кнопка «Отрывок», потом нажми на первый и последний такт — программа будет повторять только их. Убрать — крестик рядом с «Отрывок».</p>
     <p><b>Уровень</b> — насколько точно нужно попадать: Новичок ±30 центов, Любитель ±20, Профи ±10 (полутон — 100 центов).</p>
@@ -1438,8 +1441,17 @@ function paint(){
     const n=piece.notes[i];
     g.setAttribute('class', i===idx ? 'n-cur' : (n.state?'n-'+n.state:''));
   });
-  paintArrow();
+  paintArrow(); paintGhosts();
   scrollToCurrent();
+}
+// «не та нота»: рядом с головкой — красная точка на высоте того, что услышала программа
+function paintGhosts(){
+  document.querySelectorAll('#sheet .ghost').forEach(e=>e.remove());
+  if(!layout) return;
+  piece.notes.forEach(n=>{ if(n.state!=='wrong'||n.heard==null) return; const ev=n.heads[0], pos=layout.evPos.get(ev); if(!pos) return;
+    const g=pos.svg.querySelector(`g[data-i="${n.i}"]`); if(!g) return;
+    const sp=spell(n.heard, piece.measures[n.m].fifths), step=sp.oct*7+LI[sp.letter];
+    const e=document.createElementNS(SVGNS,'ellipse'); e.setAttribute('cx',pos.x+12); e.setAttribute('cy',yOf(step)); e.setAttribute('rx',4.5); e.setAttribute('ry',3.4); e.setAttribute('class','ghost'); g.appendChild(e); });
 }
 let lastScrollIdx=-1;
 function scrollToCurrent(force){
@@ -1528,7 +1540,7 @@ let lastAccepted=-1, released=true, relPeak=0, relLow=-1, relQ0=-1, relS0=-1, fl
 
 function rangeStart(){ if(!loop) return 0; const i=piece.notes.findIndex(n=>n.m>=loop.a && n.m<=loop.b); return i<0? piece.notes.length : i; }
 function rangeEnd(){ if(!loop) return piece.notes.length-1; let e=-1; piece.notes.forEach((n,i)=>{ if(n.m>=loop.a && n.m<=loop.b) e=i; }); return e; }
-function clearStates(a,b){ for(let i=a;i<=b;i++){ const n=piece.notes[i]; n.state=''; n.cents=null; n.miss=null; n.wrong=[]; } }
+function clearStates(a,b){ for(let i=a;i<=b;i++){ const n=piece.notes[i]; n.state=''; n.cents=null; n.miss=null; n.wrong=[]; n.heard=null; } }
 
 /* === определение высоты звука (MPM) — проверенный код, не трогать без регресс-теста === */
 const LEVELS=[{id:'novice',title:'Новичок',cents:30},{id:'amateur',title:'Любитель',cents:20},{id:'pro',title:'Профи',cents:10}];
@@ -1652,8 +1664,9 @@ function loop_(){
   if(mode==='tempo'){ tempoFrame(p); return; }
   if(mode==='demo'){ demoFrame(p); return; }
   const target=piece.notes[idx];
-  if(mode==='mic' && ctx.currentTime<sampleMute){ showHeard(null,target); return; }   // только что звучал образец ноты — эхо не засчитываем
-  if(mode==='mic') watchRelease(p, buf[0]===0 && buf[1]===0 && buf[2]===0);   // начало окна в нулях — микрофон только включился
+  const live= mode==='mic'||mode==='free';
+  if(live && ctx.currentTime<sampleMute){ showHeard(null,target); return; }   // только что звучал образец ноты — эхо не засчитываем
+  if(live) watchRelease(p, buf[0]===0 && buf[1]===0 && buf[2]===0);   // начало окна в нулях — микрофон только включился
 
   if(!p){
     stable.length=0; otherT=-1;
@@ -1681,6 +1694,7 @@ function loop_(){
 
   const last=stable.slice(-6);
   const avg=Math.round(last.reduce((s,v)=>s+v.cents,0)/last.length);
+  if(mode==='free'){ freeJudge(p, midi, avg); return; }
   if(midi===target.midi){
     if(last.some(v=>Math.abs(v.cents)>CLEAN)){     // нота та, но не чисто — ждём, пока поправит
       // первые ~0.15 с — атака смычка, высота у живой скрипки там всегда чуть гуляет: ошибкой не считаем
@@ -1732,6 +1746,24 @@ function watchRelease(p,partial){       // громкость кадра; buf у
 }
 function release(){ released=true; stable.length=0; }
 
+/* === режим «Играть» (без темпа): программа идёт за игроком, каждую ноту красит и не ждёт ===
+   Решение по устоявшейся высоте (~0.15 с той же ноты): та нота — чисто/высоко/низко по уровню; другая нота — если она
+   одна из трёх ближайших следующих, значит, перескочил (пропущенные — серые), иначе — «не та нота» (красная, рядом точка:
+   что услышала). Повтор той же ноты — как в «Учить»: только после паузы или смены смычка (watchRelease). */
+function freeJudge(p, midi, avg){
+  if(stable.length<10) return;                       // атака и переход с прошлой ноты — не судим
+  const target=piece.notes[idx], end=rangeEnd();
+  const grade=()=> Math.abs(avg)<=CLEAN? 'ok' : avg>0? 'hi' : 'lo';
+  if(midi===target.midi){ target.state=grade(); target.cents=avg; target.heard=null; }
+  else {
+    let k=-1; for(let j=1;j<=3 && idx+j<=end;j++){ if(piece.notes[idx+j].midi===midi){ k=j; break; } }
+    if(k>0){ for(let j=0;j<k;j++){ const n=piece.notes[idx+j]; n.state='miss'; n.cents=null; n.heard=null; } idx+=k; const n=piece.notes[idx]; n.state=grade(); n.cents=avg; n.heard=null; }
+    else { target.state='wrong'; target.cents=avg; target.heard=midi; setStatus(`Слышу «${midiToName(midi).ru}» вместо «${target.ru}»`,'bad'); }
+  }
+  lastAccepted=midi; released=false; relPeak=p.rms; relLow=-1; relQ0=-1; relS0=-1; otherT=-1; stable.length=0;
+  advance();
+}
+
 function flashOk(text){
   const el=document.getElementById('okFlash');
   document.getElementById('okNext').textContent=text;
@@ -1739,7 +1771,8 @@ function flashOk(text){
 }
 
 function advance(){
-  const accepted=piece.notes[idx].state!=='skip';
+  const st=piece.notes[idx].state;
+  const accepted= st!=='skip' && !(mode==='free' && st!=='ok');   // в «Играть» зелёная вспышка — только за чистую ноту
   const end=rangeEnd();
   idx++;
   if(idx>end){
@@ -1752,7 +1785,7 @@ function advance(){
     finish(); return;
   }
   if(accepted) flashOk('· дальше: '+piece.notes[idx].ru);
-  setStatus('');
+  if(mode!=='free' || accepted) setStatus('');
   paint(); updateTarget();
 }
 
@@ -1954,7 +1987,7 @@ function demoFrame(p){
 let noteDir=0, dirWant=0, dirRun=0, arrowIdx=-1;
 function noteArrow(target, midiF){
   let d=0;
-  if(midiF!=null && target && (mode==='mic' || mode==='tempo')){
+  if(midiF!=null && target && (mode==='mic' || mode==='free' || mode==='tempo')){
     const diff=(midiF-target.midi)*100;
     if(Math.abs(diff)>CLEAN) d= diff>0? 1 : -1;
   }
@@ -1969,7 +2002,7 @@ function paintArrow(){
 }
 
 function showHeard(h,target){
-  const hf= h? 69+12*Math.log2(h.freq/440) : null, mf= h && !(mode==='mic' && holding(hf))? hf : null;
+  const hf= h? 69+12*Math.log2(h.freq/440) : null, mf= h && !((mode==='mic'||mode==='free') && holding(hf))? hf : null;
   drawBoard(target, mf); noteArrow(target, mf);
   const hn=document.getElementById('heardNote'), hi=document.getElementById('heardInfo');
   const nd=document.getElementById('needle');
@@ -2000,18 +2033,23 @@ function setStatus(s,cls){ const el=document.getElementById('status'); el.textCo
 
 /* === конец === */
 function finish(){
-  const a=rangeStart(), b=rangeEnd();
+  const a=rangeStart(), b=rangeEnd(), wasFree= mode==='free';
   stop();
   recordProgress(a,b);
-  setStatus('Готово! Мелодия сыграна до конца.','ok');
+  if(!wasFree){ setStatus('Готово! Мелодия сыграна до конца.','ok'); return; }
+  const r=summary(a,b), n=r.total-r.ok;
+  if(!n){ setStatus('Готово! Все ноты верно.','ok'); return; }
+  const names=[...new Set(r.trouble.map(mName))];
+  const what=[]; if(r.wrong) what.push(r.wrong+' не та'); if(r.hi+r.lo) what.push((r.hi+r.lo)+' не чисто'); if(r.miss) what.push(r.miss+' пропущено');
+  setStatus(`Готово! Не так ${n} ${plural(n,'нота','ноты','нот')} (${what.join(', ')}) — ${names.length===1?'такт':'такты'} ${names.join(', ')}. Нажми на цветную ноту — скажу, что услышала.`,'warn');
 }
 function summary(a,b){
-  let ok=0,total=0,hi=0,lo=0,miss=0,skip=0,mid=0,bad=0; const trouble=new Set();
+  let ok=0,total=0,hi=0,lo=0,miss=0,skip=0,mid=0,bad=0,wrong=0; const trouble=new Set();
   for(let i=a;i<=b;i++){ const n=piece.notes[i]; total++;
-    if(n.state==='ok') ok++; else { trouble.add(n.m); if(n.state==='hi') hi++; else if(n.state==='lo') lo++; else if(n.state==='miss') miss++; else if(n.state==='skip') skip++; else if(n.state==='mid') mid++; else if(n.state==='bad') bad++; } }
+    if(n.state==='ok') ok++; else { trouble.add(n.m); if(n.state==='hi') hi++; else if(n.state==='lo') lo++; else if(n.state==='miss') miss++; else if(n.state==='skip') skip++; else if(n.state==='mid') mid++; else if(n.state==='bad') bad++; else if(n.state==='wrong') wrong++; } }
   const ratio= total? ok/total : 0;
   const stars= ratio>=0.9? 3 : ratio>=0.7? 2 : ratio>=0.5? 1 : 0;
-  return {ok,total,hi,lo,miss,skip,mid,bad,stars,trouble:[...trouble].sort((x,y)=>x-y)};
+  return {ok,total,hi,lo,miss,skip,mid,bad,wrong,stars,trouble:[...trouble].sort((x,y)=>x-y)};
 }
 
 /* === запуск / стоп === */
@@ -2043,9 +2081,9 @@ async function start(){
     setStatus(`Слушай счёт: ${tl.beatsIn} щелчка — и начинай с первой ноты.`);
   } else {
     if(idx>b || idx<a){ clearStates(a,b); idx=a; } else clearStates(idx,b);   // сыграно до конца — сначала; иначе — с текущей (или нажатой) ноты
-    mode='mic'; running=true; lastAccepted=-1; released=true; stable.length=0;
-    document.getElementById('btnSkip').disabled=false;
-    setStatus('Слушаю. Играй первую ноту.');
+    mode= uiMode==='free'? 'free' : 'mic'; running=true; lastAccepted=-1; released=true; stable.length=0;
+    if(mode==='mic'){ document.getElementById('btnSkip').disabled=false; setStatus('Слушаю. Играй первую ноту.'); }
+    else setStatus('Слушаю. Играй в своём темпе — ноты будут окрашиваться; программа не ждёт и не останавливает.');
   }
   setStartBtn();
   paint(); updateTarget();
@@ -2281,7 +2319,7 @@ function openPiece(entry){
   catch(e){ alert('Не получилось открыть ноты: '+e.message); return; }
   stop(); setSelecting(0);
   piece=p; pieceEntry=entry; loop=null; idx=0; lastAccepted=-1; released=true; stable.length=0;
-  piece.notes.forEach(n=>{ n.state=''; n.cents=null; n.miss=null; n.wrong=[]; });
+  piece.notes.forEach(n=>{ n.state=''; n.cents=null; n.miss=null; n.wrong=[]; n.heard=null; });
   piece.places=[...new Set(piece.notes.filter(n=>n.fing).map(n=>n.fing.str+':'+n.fing.d))];
   const pr=progress[entry.id]||{};
   tempo.bpm= pr.bpm || piece.bpm || 72;
@@ -2301,9 +2339,10 @@ function plural(n,a,b,c){ const m=n%10, h=n%100; return (m===1&&h!==11)? a : (m>
 function setUiMode(m, silent){
   uiMode=m;
   document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on', b.dataset.mode===m));
-  document.getElementById('tempoBox').hidden= m==='learn';
+  document.getElementById('tempoBox').hidden= m==='learn'||m==='free';
   document.getElementById('metroLab').hidden= m!=='play';
-  document.getElementById('legend').hidden= m!=='play';
+  document.getElementById('legend').hidden= !(m==='play'||m==='free');
+  document.getElementById('legWrong').hidden= m!=='free'; document.getElementById('legMiss').textContent= m==='free'? 'пропущена' : 'не услышал';
   document.getElementById('btnSkip').hidden= m!=='learn';
   document.getElementById('bpmReset').hidden= !(piece && piece.bpm && tempo.bpm!==piece.bpm);
   document.getElementById('bpm').value=tempo.bpm;
@@ -2343,13 +2382,13 @@ async function playSample(midi, secs){
 }
 function noteTap(i){
   const n=piece.notes[i];
-  if(running && mode!=='mic') return;
+  if(running && mode!=='mic' && mode!=='free') return;
   if(running){ idx=i; stable.length=0; lastAccepted=-1; released=true; setStatus(''); paint(); updateTarget(); return; }   // «Учить»: перескочить сюда
   idx=i; paint(); updateTarget();
   const c= n.cents!=null? ` (${n.cents>0?'+':''}${n.cents} ц)` : '';
-  const what= n.state==='ok'? '✓ чисто'+c : n.state==='hi'? 'высоко'+c : n.state==='lo'? 'низко'+c : n.state==='miss'? 'не услышал'
+  const what= n.state==='ok'? '✓ чисто'+c : n.state==='hi'? 'высоко'+c : n.state==='lo'? 'низко'+c : n.state==='wrong'? 'не та нота — слышала «'+midiToName(n.heard).ru+'»' : n.state==='miss'? (uiMode==='free'? 'пропущена' : 'не услышал')
             : n.state==='mid'||n.state==='bad'? 'взята не с первого раза'+c : n.state==='skip'? 'пропущена' : '';
-  const tail= uiMode==='learn'? ' «Начать» — играть с этой ноты.' : uiMode==='play'? ' «Начать» — сыграть с начала, в темпе.' : ' «▶ Слушать» — послушать с начала.';
+  const tail= uiMode==='learn'||uiMode==='free'? ' «Начать» — играть с этой ноты.' : uiMode==='play'? ' «Начать» — сыграть с начала, в темпе.' : ' «▶ Слушать» — послушать с начала.';
   setStatus(`${n.ru} — ${n.how}${what? ' · '+what : ''}.`+tail, n.state==='ok'?'ok':(n.state==='hi'||n.state==='lo')?'warn':'');
   playSample(n.midi, Math.min(2, Math.max(0.8, n.q*spq())));
 }
