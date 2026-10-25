@@ -393,24 +393,6 @@
   </div>
 </section>
 
-<!-- ===== результат ===== -->
-<div class="modal" id="result" hidden>
-  <div class="box">
-    <button class="x" id="resClose" aria-label="закрыть">×</button>
-    <h2 id="resTitle">Готово!</h2>
-    <div class="rstars" id="resStars"><i>★</i><i>★</i><i>★</i></div>
-    <div class="rnums" id="resNums"></div>
-    <div class="rtrouble" id="resTrouble"></div>
-    <p class="muted small" style="margin:0 0 12px">Оценивается только высота звука; ритм — нет. Цветные ноты остаются на экране: нажми на ноту, чтобы увидеть, на сколько она ушла.</p>
-    <div class="btns">
-      <button class="act" id="resAgain">Ещё раз</button>
-      <button class="act ghost" id="resSlower">Медленнее</button>
-      <button class="act ghost" id="resLoop">Повторить трудные такты</button>
-      <button class="act ghost" id="resHome">К списку</button>
-    </div>
-  </div>
-</div>
-
 <!-- ===== загрузка нот ===== -->
 <div class="modal" id="loadDlg" hidden>
   <div class="box">
@@ -450,7 +432,7 @@
     <h2>Как это работает</h2>
     <p><b>Слушать</b> — настоящая скрипка играет мелодию, ноты подсвечиваются. Сначала послушай, потом играй сам.</p>
     <p><b>Учить</b> — программа ждёт каждую ноту сколько нужно и идёт дальше, только когда нота взята чисто. Снизу — какой палец и какая струна, на грифе — куда ставить палец; стрелка на ноте показывает, выше или ниже ты играешь.</p>
-    <p><b>Играть</b> — ноты идут сами в выбранном темпе (сначала счёт), каждая окрашивается: зелёная — чисто, красная — высоко, фиолетовая — низко, серая — не услышал. В конце — результат и звёзды.</p>
+    <p><b>Играть</b> — ноты идут сами в выбранном темпе (сначала счёт), каждая окрашивается: зелёная — чисто, красная — высоко, фиолетовая — низко, серая — не услышал. В конце — «Готово!», цветные ноты остаются на экране; звёзды за мелодию видны в списке.</p>
     <p><b>Нажми на любую ноту</b> — услышишь, как она звучит, увидишь палец и струну; «Начать» пойдёт с неё.</p>
     <p><b>Отрывок:</b> кнопка «Отрывок», потом нажми на первый и последний такт — программа будет повторять только их. Убрать — крестик рядом с «Отрывок».</p>
     <p><b>Уровень</b> — насколько точно нужно попадать: Новичок ±30 центов, Любитель ±20, Профи ±10 (полутон — 100 центов).</p>
@@ -1859,7 +1841,8 @@ function finishTempo(){
   }
   const a=tl.a, b=tl.b;
   idx=b; stop();
-  showResult(a,b,'play');
+  recordProgress(a,b);
+  setStatus('Готово! Зелёные ноты — чисто, красные — высоко, фиолетовые — низко, серые — не услышал.','ok');
 }
 
 /* === демо: живая скрипка из библиотеки violin/ в тот же анализатор ===
@@ -2019,7 +2002,8 @@ function setStatus(s,cls){ const el=document.getElementById('status'); el.textCo
 function finish(){
   const a=rangeStart(), b=rangeEnd();
   stop();
-  showResult(a,b,'learn');
+  recordProgress(a,b);
+  setStatus('Готово! Мелодия сыграна до конца.','ok');
 }
 function summary(a,b){
   let ok=0,total=0,hi=0,lo=0,miss=0,skip=0,mid=0,bad=0; const trouble=new Set();
@@ -2335,37 +2319,14 @@ function setStartBtn(){
 }
 document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>{ if(uiMode===b.dataset.mode) return; stop(); setUiMode(b.dataset.mode); if(piece){ clearStates(0,piece.notes.length-1); idx=rangeStart(); paint(); updateTarget(); } });
 
-/* === результат === */
-let lastRange=null;
-function showResult(a,b,kind){
-  const r=summary(a,b); lastRange={a,b,kind};
+/* === конец мелодии: только «Готово!» (окно результата убрано по решению Константина 25.10); звёзды в списке считаются тихо === */
+function recordProgress(a,b){
+  const r=summary(a,b);
   const pr=progress[pieceEntry.id]||{plays:0};
   pr.plays=(pr.plays||0)+1;
   if(!loop && (pr.stars==null || r.stars>=pr.stars)){ pr.stars=r.stars; pr.ok=r.ok; pr.total=r.total; }
   pr.bpm=tempo.bpm; progress[pieceEntry.id]=pr; saveProgress();
-  document.getElementById('resTitle').textContent= r.stars===3? 'Отлично!' : r.stars===2? 'Хорошо!' : r.stars===1? 'Неплохо' : 'Готово';
-  document.getElementById('resStars').className='rstars s'+r.stars;
-  const nums=[`<span><b>${r.ok}</b>из ${r.total} ${kind==='play'? 'чисто' : 'с первого раза'}</span>`];
-  if(kind==='play'){ if(r.hi) nums.push(`<span><b>${r.hi}</b>высоко</span>`); if(r.lo) nums.push(`<span><b>${r.lo}</b>низко</span>`); if(r.miss) nums.push(`<span><b>${r.miss}</b>не услышал</span>`); }
-  else { if(r.mid+r.bad) nums.push(`<span><b>${r.mid+r.bad}</b>поправлены</span>`); if(r.skip) nums.push(`<span><b>${r.skip}</b>пропущено</span>`); }
-  document.getElementById('resNums').innerHTML=nums.join('');
-  const tr=r.trouble;
-  const names=[...new Set(tr.map(mName))], nMeas=new Set(piece.notes.slice(a,b+1).map(n=>n.m)).size;
-  document.getElementById('resTrouble').textContent= tr.length? (tr.length>=nMeas? '' : 'Потренируй '+(tr.length===1?'такт ':'такты ')+names.join(', ')+'.') : 'Все ноты чисто — можно быстрее или следующую мелодию.';
-  document.getElementById('resLoop').hidden=!tr.length;
-  document.getElementById('resSlower').hidden= kind!=='play' || tempo.bpm<=30;
-  document.getElementById('result').hidden=false;
 }
-function hideResult(){ document.getElementById('result').hidden=true; }
-document.getElementById('resClose').onclick=hideResult;
-document.getElementById('resAgain').onclick=()=>{ hideResult(); if(uiMode==='listen') runDemo(); else start(); };
-document.getElementById('resSlower').onclick=()=>{ hideResult(); setBpm(tempo.bpm-10); start(); };
-document.getElementById('resHome').onclick=()=>{ hideResult(); stop(); showScreen('home'); };
-document.getElementById('resLoop').onclick=()=>{
-  hideResult(); const r=summary(lastRange.a,lastRange.b); if(!r.trouble.length) return;
-  const t=r.trouble; setLoop(t[0], t[1]===t[0]+1? t[1] : t[0]);          // первый трудный такт и следующий, если он тоже трудный
-  if(uiMode==='listen') runDemo(); else start();
-};
 
 /* === нажатие на ноту: услышать её, увидеть палец, начать с неё === */
 async function playSample(midi, secs){
@@ -2431,7 +2392,7 @@ document.getElementById('btnTune').onclick=()=>openTuner('home');
 document.getElementById('btnTune2').onclick=()=>openTuner('play');
 document.getElementById('btnHelp').onclick=document.getElementById('btnHelp2').onclick=()=>{ document.getElementById('help').hidden=false; };
 document.getElementById('helpClose').onclick=()=>{ document.getElementById('help').hidden=true; };
-document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m && m.id!=='result') m.hidden=true; }));
+document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.hidden=true; }));
 
 // уровень
 const levelSel=document.getElementById('levelSel');
