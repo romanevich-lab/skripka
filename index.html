@@ -240,6 +240,16 @@
   .tnow{display:flex;align-items:baseline;gap:12px;margin:0;flex-wrap:wrap}
   .tnow .tbig{font-size:40px;font-weight:700;line-height:1;min-height:1em;color:var(--ink)}
   .tnow span{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
+  /* картинка: подставка, струны, подгрифок с четырьмя машинками; у нужной — стрелка, в какую сторону крутить */
+  .thero{display:inline-flex;align-items:center;gap:14px}
+  #tPic{height:52px;width:auto;flex:none;overflow:visible}
+  .tp-bridge{fill:#c9b48a} .tp-str{stroke:var(--muted);stroke-width:1.6} .tp-str.on{stroke:var(--accent);stroke-width:3.2}
+  .tp-tail{fill:#2b2620;stroke:var(--line);stroke-width:1.5}
+  .tp-screw{fill:#cfc8b8;stroke:#8a8273;stroke-width:1.5} .tp-slot{stroke:#5b554a;stroke-width:2.2;stroke-linecap:round}
+  .tp-screw.on{fill:var(--accent);stroke:#fff;stroke-width:2.5} .tp-screw.ok{fill:var(--ok);stroke:#fff;stroke-width:2.5}
+  .tp-slot.on{stroke:#fff}
+  .tp-arrow{fill:none;stroke:var(--warn);stroke-width:5.5;stroke-linecap:round} .tp-head{fill:var(--warn)}
+  .tp-halo{fill:none;stroke:var(--card);stroke-width:10;stroke-linecap:round}
   .tmeter{position:relative;height:40px;margin-top:10px;border-radius:8px;overflow:hidden;
           background:linear-gradient(90deg,var(--line) 0%,var(--line) 45%, var(--ok50) 45%,var(--ok50) 55%, var(--line) 55%,var(--line) 100%)}
   .tmeter i{position:absolute;top:0;bottom:0;left:50%;width:5px;margin-left:-2.5px;background:var(--ink);border-radius:2px;
@@ -357,6 +367,7 @@
     .tpanel{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;margin-top:18px}
     .tnow{flex-direction:column;align-items:center;text-align:center;gap:8px}
     .tnow .tbig{font-size:clamp(96px,17vh,190px)}
+    .thero{gap:44px} #tPic{height:clamp(120px,19vh,210px)}
     .tnow span{font-size:20px}
     .tmeter{height:clamp(64px,9vh,104px);margin-top:22px;border-radius:14px}
     .tmeter i{width:10px;margin-left:-5px;border-radius:5px}
@@ -391,7 +402,7 @@
       <div class="thead"><b>Настройка скрипки</b></div>
       <div class="tstrings" id="tStrings"></div>
       <div class="tpanel" id="tPanel">
-        <div class="tnow"><span class="tbig" id="tNote"></span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
+        <div class="tnow"><span class="thero"><span class="tbig" id="tNote"></span><svg id="tPic" viewBox="0 0 200 156" aria-hidden="true"></svg></span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
         <div class="tmeter"><u></u><i id="tNeedle"></i></div>
         <div class="tlab"><span>ниже</span><span>чисто</span><span>выше</span></div>
         <div class="tokbox"><b id="tOkTitle"></b><span id="tOkSub"></span></div>
@@ -1758,7 +1769,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v10 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v11 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
@@ -2241,6 +2252,28 @@ function renderTuner(){
     };
     box.appendChild(b);
   });
+  tunePic(tuneIdx,0);
+}
+// st: 0 — просто показать, какая машинка; -1 — подтянуть (по часовой); 1 — ослабить (против часовой); 2 — настроена
+let tunePicKey='';
+function tunePic(i, st){
+  const key=i+':'+st; if(key===tunePicKey) return; tunePicKey=key;
+  const svg=document.getElementById('tPic'); if(!svg) return;
+  const X=[40,80,120,160], Y=98; let o='<rect x="14" y="12" width="172" height="7" rx="3" class="tp-bridge"/>';
+  X.forEach((x,k)=>{ o+=`<line x1="${x}" y1="0" x2="${x}" y2="${Y}" class="tp-str${k===i?' on':''}"/>`; });
+  o+='<path d="M20 80 H180 L152 154 H48 Z" class="tp-tail"/>';
+  X.forEach((x,k)=>{ const on=k===i; o+=`<circle cx="${x}" cy="${Y}" r="${on?13:9}" class="tp-screw${on?(st===2?' ok':' on'):''}"/>`;
+    o+= on && st===2? `<path d="M${x-6} ${Y} l4.5 5 l8 -10" class="tp-slot on" fill="none"/>` : `<line x1="${x-5}" y1="${Y}" x2="${x+5}" y2="${Y}" class="tp-slot${on?' on':''}"/>`; });
+  if(i>=0 && (st===-1||st===1)){
+    // дуга вокруг машинки: по часовой (подтянуть) или против часовой (ослабить), со стрелкой на конце
+    const cw=st===-1, r=25, cx=X[i], a0=(cw?135:45)*Math.PI/180, a1=(cw?45:135)*Math.PI/180;
+    const x0=cx+r*Math.cos(a0), y0=Y+r*Math.sin(a0), x1=cx+r*Math.cos(a1), y1=Y+r*Math.sin(a1);
+    const tx=(cw?-1:1)*Math.sin(a1), ty=(cw?1:-1)*Math.cos(a1), nx=Math.cos(a1), ny=Math.sin(a1);   // касательная и радиус в конце дуги
+    const d=`M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 1 ${cw?1:0} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+    o+=`<path d="${d}" class="tp-halo"/><path d="${d}" class="tp-arrow"/>`;
+    o+=`<path d="M${(x1+tx*11).toFixed(1)} ${(y1+ty*11).toFixed(1)} L${(x1+nx*9-tx*2).toFixed(1)} ${(y1+ny*9-ty*2).toFixed(1)} L${(x1-nx*9-tx*2).toFixed(1)} ${(y1-ny*9-ty*2).toFixed(1)} Z" class="tp-head"/>`;
+  }
+  svg.innerHTML=o;
 }
 function tuneTip(text,cls){ const el=document.getElementById('tTip'); el.textContent=text; el.className='ttip'+(cls?' '+cls:''); }
 function tuneBox(title,sub){
@@ -2271,18 +2304,18 @@ function tuneIdle(from){
 function tuneFrame(p){
   if(tuneWait || (tuneSel==null && tuneOk.every(Boolean))) return;
   const nd=document.getElementById('tNeedle');
-  if(ctx.currentTime<tuneMute){ nd.classList.remove('live','ok'); tuneHold=0; return; }
-  if(!p){ nd.classList.remove('live','ok'); tuneHold=0; return; }
+  if(ctx.currentTime<tuneMute){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0); return; }
+  if(!p){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0); return; }
   const midiF=69+12*Math.log2(p.freq/440);
   const fold=d=>d-12*Math.round(d/12);
   let i=tuneSel;
   if(i==null){ let best=99; TSTR.forEach((t,k)=>{ const d=Math.abs(fold(midiF-t.m)); if(d<best){best=d;i=k;} });
-    if(best>2.5){ nd.classList.remove('live','ok'); tuneTip('Это не открытая струна. Проведи смычком по струне без пальцев.'); return; }
-    if(tuneOk[i]){ nd.classList.remove('live','ok'); tuneHold=0;
+    if(best>2.5){ nd.classList.remove('live','ok'); tunePic(tuneIdx,0); tuneTip('Это не открытая струна. Проведи смычком по струне без пальцев.'); return; }
+    if(tuneOk[i]){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0);
       tuneTip(`Струна «${TSTR[i].n}» уже настроена ✓ — теперь «${TSTR[tuneIdx].n}».`,'ok'); return; } }
   else {
     const k=TSTR.findIndex((t,j)=>j!==i && Math.abs(midiF-t.m)<=1.5);
-    if(k>=0){ nd.classList.remove('live','ok'); tuneHold=0;
+    if(k>=0){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0);
       document.getElementById('tHz').textContent=`нужно ${(440*Math.pow(2,(TSTR[i].m-69)/12)).toFixed(1)} Гц`;
       tuneTip(`Звучит струна «${TSTR[k].n}», а выбрана «${TSTR[i].n}».`,'move'); return; }
   }
@@ -2292,6 +2325,7 @@ function tuneFrame(p){
   document.getElementById('tHz').textContent=`играешь ${(want*Math.pow(2,c/1200)).toFixed(1)} Гц · нужно ${want.toFixed(1)} Гц · ${c>0?'+':''}${c} ц`;
   nd.classList.add('live'); nd.style.left=(50+Math.max(-50,Math.min(50,c)))+'%';
   nd.classList.toggle('ok',Math.abs(c)<=TUNE_OK);
+  tunePic(i, Math.abs(c)<=TUNE_OK? 2 : c<0? -1 : 1);
   if(Math.abs(c)<=TUNE_OK){
     if(++tuneHold>=45){ tuneDone(i); return; }
     tuneTip('Чисто — подержи звук секунду…','ok');
