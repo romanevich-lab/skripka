@@ -1640,7 +1640,7 @@ function drawBoard(target, midiF){
           const ax=x+(p.i<3?11:-11);
           el('line',{x1:ax,x2:ax,y1:y0,y2:y1,class:'fb-arrow'});
           el('path',{d:`M${ax-5} ${y1-dir*6} L${ax} ${y1} L${ax+5} ${y1-dir*6} Z`,class:'fb-head'});
-          tip.textContent=diff<0?'↓ палец к подставке':'↑ палец к завитку'; tip.className='fbtip move';
+          tip.textContent=diff<0?'↓ палец ближе к себе':'↑ палец дальше от себя'; tip.className='fbtip move';   // к подставке / к завитку
         }
       }
     }
@@ -1772,7 +1772,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v12 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v13 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
