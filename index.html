@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f6f5f2">
 <title>Скрипка — играй по нотам</title>
@@ -116,6 +116,7 @@
   @media (max-width:520px){
     .playrow{gap:6px} .playrow #sheetCard{padding:8px 6px}
     .vmeter{width:70px;padding:8px 4px} .fboard{width:70px} .vmeter .nm{font-size:16px} .vmeter .hz{font-size:12px}
+    .modes button{padding:9px 10px}
   }
   /* шкала ±50 центов: 1 цент = 1% высоты; зелёная зона — «чисто» по выбранному уровню (--c), жёлтая — ещё 15 центов */
   .needle{--c:20%;--w:35%;position:relative;flex:1;min-height:120px;width:40px;border-radius:8px;overflow:hidden;
@@ -152,14 +153,14 @@
   .rest{fill:var(--ink)} .rest.ln{stroke:var(--ink);stroke-width:1.6;fill:none}
   .tie{fill:none;stroke:var(--ink);stroke-width:1.5}
   .tup{fill:var(--muted);font-size:10px;font-style:italic;text-anchor:middle}
-  .fing{fill:var(--muted);font-size:11px;text-anchor:middle;font-weight:600}
+  .fing{fill:var(--muted);font-size:15px;text-anchor:middle;font-weight:600}
   .lyr{fill:var(--ink);font-size:12px;text-anchor:middle}
   .ledger{stroke:var(--ink);stroke-width:1;opacity:.55}
   .hl{fill:var(--accent);opacity:0}
   .mhit{fill:transparent;cursor:pointer;pointer-events:none}
   #sheet.selecting .mhit{pointer-events:all}
   #sheet g[data-i]{cursor:pointer}
-  .lyr.nm{fill:var(--muted);font-size:11px}
+  .lyr.nm{fill:var(--muted);font-size:13px}
   button.act.on{background:var(--accent);color:#fff;border-color:var(--accent)}
   .mloop{fill:var(--accent);opacity:.07}
   .mloop-edge{stroke:var(--accent);stroke-width:2.5;fill:none;opacity:.85}
@@ -169,7 +170,7 @@
   .n-ok .hl,.n-mid .hl,.n-bad .hl{fill:var(--ok);opacity:.22}
   .n-cur .nh,.n-cur .nh.hollow{fill:var(--accent);stroke:var(--accent);stroke-width:3}
   .n-cur .stem{stroke:var(--accent);stroke-width:2.6} .n-cur .acc{fill:var(--accent)} .n-cur .beam,.n-cur .flag{fill:var(--accent)}
-  .n-cur .fing{fill:var(--accent);font-size:15px;font-weight:700}
+  .n-cur .fing{fill:var(--accent);font-size:21px;font-weight:700}
   .n-ok .nh,.n-ok .nh.hollow{fill:var(--ok);stroke:var(--ok)} .n-ok .stem{stroke:var(--ok)} .n-ok .acc,.n-ok .flag{fill:var(--ok)}
   .n-mid .nh,.n-mid .nh.hollow{fill:var(--warn);stroke:var(--warn)} .n-mid .stem{stroke:var(--warn)} .n-mid .acc,.n-mid .flag{fill:var(--warn)}
   .n-bad .nh,.n-bad .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-bad .stem{stroke:var(--bad)} .n-bad .acc,.n-bad .flag{fill:var(--bad)}
@@ -182,14 +183,20 @@
   .arr{display:none;fill:none;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
   .arr.halo{stroke:var(--card);stroke-width:8}
   .arr.up:not(.halo){stroke:var(--bad)} .arr.down:not(.halo){stroke:var(--low)}
-  .n-cur.n-up .arr.up, .n-cur.n-down .arr.down{display:inline}
+  .n-cur.n-up .arr.up, .n-cur.n-down .arr.down, .n-hi .arr.up, .n-lo .arr.down{display:inline}
   .playhead{stroke:var(--accent);stroke-width:2;opacity:.55}
 
   /* нижняя полоса: что нужно + что говорит программа */
-  .target{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  #targetCard{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
   .bignote{font-size:40px;font-weight:700;line-height:1;min-width:120px}
+  .bignote b{font-weight:700}
   .bignote small{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:6px}
-  .status{font-size:15px;min-height:22px;margin-top:8px}
+  .bignote small i{font-style:normal}
+  #targetCard .bignote{order:1}
+  .status{order:2;font-size:15px;min-height:22px;flex-basis:100%}
+  #targetCard .ctrl{order:3;flex:1 1 260px}
+  #targetCard .tempo{flex-basis:100%}
+  #targetCard .legend{order:4;flex-basis:100%}
   .status.ok{color:var(--ok)} .status.warn{color:var(--warn)} .status.bad{color:var(--bad)}
   .ctrl{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
   .ctrl .sep{flex-basis:100%;height:0}
@@ -231,7 +238,7 @@
   .tokbox span{font-size:17px;font-weight:600}
   .tpanel.done .tokbox{opacity:1}
   .tnow{display:flex;align-items:baseline;gap:12px;margin:0;flex-wrap:wrap}
-  .tnow .tbig{font-size:40px;font-weight:700;line-height:1}
+  .tnow .tbig{font-size:40px;font-weight:700;line-height:1;min-height:1em;color:var(--ink)}
   .tnow span{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
   .tmeter{position:relative;height:40px;margin-top:10px;border-radius:8px;overflow:hidden;
           background:linear-gradient(90deg,var(--line) 0%,var(--line) 45%, var(--ok50) 45%,var(--ok50) 55%, var(--line) 55%,var(--line) 100%)}
@@ -268,6 +275,108 @@
   details{margin-top:10px;font-size:14px} summary{cursor:pointer;color:var(--accent)}
   .help p{margin:6px 0} .help code{background:var(--soft);padding:1px 5px;border-radius:5px;font-size:14px}
   kbd{display:inline-block;border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:13px}
+
+  /* ---- как приложение, а не как страница: не выделяется, не тянется за край, не увеличивается двойным нажатием ---- */
+  html{overscroll-behavior:none}
+  body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none;touch-action:manipulation}
+  input,textarea{-webkit-user-select:text;user-select:text}
+  button.act:active:not(:disabled),.pick:active,.modes button:active,.tchip:active{transform:scale(.97);opacity:.8}
+  button.act,.pick,.modes button,.tchip{transition:transform .06s ease-out,opacity .06s ease-out}
+
+  /* ---- полоса над нотами: режимы и настройки; строка темпа — внутри нижней панели ---- */
+  /* маленький экран: настройки — под нотами (ноты выше на экране), как было */
+  #scrPlay>.wrap{display:flex;flex-direction:column}
+  .toolrow{display:contents}
+  #scrPlay .opts{order:5;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 16px}
+
+  /* ==== большой экран (iPad, компьютер) ====
+     Экран игры и настройка занимают весь экран и не прокручиваются: ноты — на всю свободную высоту.
+     iPad стоит на пюпитре, руки заняты, до глаз около метра — поэтому всё, что читают во время игры, крупное. */
+  @media (min-width:700px) and (min-height:600px){
+    #scrTune,#scrPlay{height:100vh;height:calc(100dvh - var(--dbg,0px));overflow:hidden}
+    #scrTune>.wrap,#scrPlay>.wrap{height:100%;display:flex;flex-direction:column;
+      padding:12px max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+    #scrHome>.wrap{padding-bottom:max(56px,env(safe-area-inset-bottom))}
+    h1{font-size:30px}
+    .pick{min-height:44px;font-size:16px;padding:10px 16px}
+    .pick.q{width:44px}
+    .top .ttl b{font-size:21px} .top .ttl span{font-size:14px}
+    button.act{min-height:54px;font-size:17px;padding:14px 22px;border-radius:14px}
+    button.act.big{font-size:22px;min-width:190px;min-height:62px}
+    .okflash{top:14px;font-size:21px;padding:12px 24px} .okflash b{font-size:24px}
+
+    /* экран игры */
+    #scrPlay .top,#scrPlay .toolrow{flex:none;margin-bottom:10px}
+    .toolrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px} .toolrow .modes{margin:0}
+    #scrPlay .opts{order:0;background:none;border:0;border-radius:0;padding:0}
+    .modes button{min-height:44px;font-size:17px}
+    .opts{font-size:15px;gap:8px 12px}
+    .opts select,.sel{min-height:44px;font-size:15px;padding:7px 8px}
+    .lt{font-size:15px} .chk{font-size:15px} .chk input{width:22px;height:22px}
+    .modes button{padding:10px 16px}
+    #scrPlay .playrow{flex:1;min-height:0;align-items:stretch;margin-bottom:10px}
+    #scrPlay .playrow #sheetCard,#scrPlay .vmeter,#scrPlay .fboard{height:auto;position:static}
+    #scrPlay .playrow #sheetCard{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+    .fboard{width:128px;padding:10px 6px}
+    .fbtip{font-size:20px;line-height:1.2;min-height:76px;margin-top:6px}
+    .vmeter{width:108px;padding:12px 8px}
+    .vmeter .lab{font-size:14px} .vmeter .end{font-size:14px;margin:8px 0 4px}
+    .vmeter .nm{font-size:28px} .vmeter .hz{font-size:14px}
+    .needle{width:56px;border-radius:12px} .needle i{height:8px;margin-top:-4px;border-radius:4px}
+    /* нижняя панель: нужная нота крупно, палец и струна, что говорит программа; под ними кнопки в один ряд */
+    #scrPlay #targetCard{flex:none;margin-bottom:0;padding:14px 18px;display:grid;align-items:center;gap:10px 22px;
+      grid-template-columns:auto minmax(0,1fr);grid-template-areas:"note status" "ctrl ctrl" "legend legend"}
+    .bignote{grid-area:note;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
+    .bignote b{font-size:60px;white-space:nowrap} .bignote b.long{font-size:46px}
+    .bignote small{font-size:15px;line-height:1.3;margin:0}
+    .bignote small i{display:none} .bignote small span{display:block;white-space:nowrap}
+    .bignote small .how{font-size:22px;font-weight:600;color:var(--ink)}
+    .status{grid-area:status;font-size:26px;font-weight:600;line-height:1.25;min-height:66px;display:flex;align-items:center}
+    #targetCard .ctrl{grid-area:ctrl;gap:10px 12px}
+    #targetCard .ctrl .act.ghost{font-size:16px;padding:14px 16px}
+    #targetCard .ctrl .act.big{min-width:170px}
+    #targetCard .tempo{flex-basis:auto;margin-left:6px}
+    #targetCard .legend{grid-area:legend}
+    @media (min-width:1000px){
+      #scrPlay #targetCard{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"note status legend" "ctrl ctrl ctrl"}
+      .bignote{flex-direction:row;align-items:center;gap:16px}
+      #targetCard .legend{max-width:330px;display:grid;grid-template-columns:auto auto;gap:1px 16px;line-height:1.3}
+      #targetCard .legend>span:last-child{grid-column:1 / -1}
+    }
+    .legend{font-size:15px} .legend i{width:14px;height:14px}
+    .tempo input[type=number]{width:76px;font-size:19px;min-height:44px} .tempo .step{width:48px;font-size:22px}
+
+    /* настройка скрипки */
+    #scrTune>.wrap{max-width:920px}
+    #scrTune .top{flex:none}
+    #scrTune .tuner{flex:1;min-height:0;margin-bottom:0;padding:22px;display:flex;flex-direction:column}
+    .tuner .thead{margin-bottom:16px} .tuner .thead b{font-size:24px} .tuner .thead span{font-size:17px}
+    .tstrings{gap:12px}
+    .tchip{padding:14px 4px;border-radius:16px}
+    .tchip b{font-size:34px} .tchip small{font-size:15px}
+    .tpanel{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;margin-top:18px}
+    .tnow{flex-direction:column;align-items:center;text-align:center;gap:8px}
+    .tnow .tbig{font-size:clamp(96px,17vh,190px)}
+    .tnow span{font-size:20px}
+    .tmeter{height:clamp(64px,9vh,104px);margin-top:22px;border-radius:14px}
+    .tmeter i{width:10px;margin-left:-5px;border-radius:5px}
+    .tlab{font-size:22px;margin-top:8px}
+    .tokbox{inset:0;border-radius:18px} .tokbox b{font-size:64px} .tokbox span{font-size:30px}
+    .ttip{font-size:26px;line-height:1.3;min-height:104px;margin:18px 0 8px;text-align:center}
+    .tuner .btns{justify-content:center;gap:14px}
+    .tuner .btns .act{min-height:64px;font-size:22px;padding:16px 34px}
+
+    /* что играть */
+    #scrHome>.wrap.narrow{max-width:1180px}
+    #lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;align-items:start}
+    #lessons .card{margin-bottom:0}
+    .lesson .lh b{font-size:20px} .lesson .lh span{font-size:15px}
+    .prow{padding:13px 18px;min-height:68px}
+    .prow .pi{width:42px;height:42px;font-size:19px}
+    .prow .pt b{font-size:18px} .prow .pt span{font-size:15px}
+    .prow .stars{font-size:21px}
+    .empty{font-size:16px}
+  }
 </style>
 </head>
 <body>
@@ -279,10 +388,10 @@
   <div class="wrap narrow">
     <header class="top"><h1>Скрипка</h1><div class="hbtns"><button class="pick" id="tDone">Пропустить настройку →</button></div></header>
     <div class="card tuner" id="tuner">
-      <div class="thead"><b>Настройка скрипки</b><span>Нажми «Начать» и проведи смычком по открытой струне — ровно и долго.</span></div>
+      <div class="thead"><b>Настройка скрипки</b></div>
       <div class="tstrings" id="tStrings"></div>
       <div class="tpanel" id="tPanel">
-        <div class="tnow"><span class="tbig" id="tNote">—</span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
+        <div class="tnow"><span class="tbig" id="tNote"></span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
         <div class="tmeter"><u></u><i id="tNeedle"></i></div>
         <div class="tlab"><span>ниже</span><span>чисто</span><span>выше</span></div>
         <div class="tokbox"><b id="tOkTitle"></b><span id="tOkSub"></span></div>
@@ -324,13 +433,23 @@
       <div class="ttl"><b id="pTitle"></b><span id="pSub"></span></div>
       <div class="hbtns"><button class="pick" id="btnTune2">Настроить скрипку</button><button class="pick q" id="btnHelp2" aria-label="как это работает">?</button></div>
     </header>
-    <div class="modes" id="modes">
-      <button data-mode="listen">▶ Слушать</button><button data-mode="learn" class="on">Учить</button><button data-mode="free">Играть</button><button data-mode="play">В темпе</button>
+    <div class="toolrow">
+      <div class="modes" id="modes">
+        <button data-mode="listen">▶ Слушать</button><button data-mode="learn" class="on">Учить</button><button data-mode="free">Играть</button><button data-mode="play">В темпе</button>
+      </div>
+      <div class="opts">
+        <label><span class="lt">Уровень:</span><select id="levelSel" autocomplete="off"></select></label>
+        <label><span class="lt">Ноты:</span><select id="zoomSel" autocomplete="off">
+          <option value="1">обычные</option><option value="1.25">крупные</option><option value="1.5">очень крупные</option></select></label>
+        <label class="chk"><input type="checkbox" id="showFing" checked>цифры пальцев</label>
+        <label class="chk"><input type="checkbox" id="showNames">названия нот</label>
+        <label class="chk" id="showLyrLab" hidden><input type="checkbox" id="showLyr" checked>слова</label>
+      </div>
     </div>
 
     <div class="playrow">
       <div class="card fboard">
-        <svg id="board" viewBox="0 0 96 300" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg id="board" viewBox="0 0 96 300" preserveAspectRatio="xMidYMin meet"></svg>
         <div class="fbtip" id="fbTip"></div>
       </div>
       <div class="card vmeter">
@@ -351,21 +470,13 @@
     </div>
 
     <div class="card" id="targetCard">
-      <div class="target">
-        <div class="bignote" id="targetNote">—<small id="targetHow"></small></div>
-        <div class="ctrl" style="flex:1">
-          <button class="act big" id="btnStart">Начать</button>
-          <button class="act ghost" id="btnSkip" disabled>Пропустить ноту</button>
-          <button class="act ghost" id="btnReset">Заново</button>
-          <button class="act ghost" id="btnLoop">Отрывок</button>
-          <span class="chip" id="loopChip" hidden>Отрывок: такты <b id="loopLab"></b><button id="loopClear" aria-label="убрать отрывок">✕</button></span>
-        </div>
-      </div>
-      <div class="status" id="status"></div>
-    </div>
-
-    <div class="card">
+      <div class="bignote" id="targetNote">—</div>
       <div class="ctrl">
+        <button class="act big" id="btnStart">Начать</button>
+        <button class="act ghost" id="btnSkip" disabled>Пропустить ноту</button>
+        <button class="act ghost" id="btnReset">Заново</button>
+        <button class="act ghost" id="btnLoop">Отрывок</button>
+        <span class="chip" id="loopChip" hidden>Отрывок: такты <b id="loopLab"></b><button id="loopClear" aria-label="убрать отрывок">✕</button></span>
         <div class="tempo" id="tempoBox">
           <span class="lt">Темп:</span>
           <button class="pick step" id="bpmMinus" aria-label="медленнее">−</button>
@@ -375,21 +486,13 @@
           <button class="pick" id="bpmReset" hidden>как в нотах</button>
           <label class="chk" id="metroLab"><input type="checkbox" id="metro">щелчки метронома</label>
         </div>
-        <div class="legend" id="legend">
-          <span><i style="background:var(--ok)"></i>чисто</span>
-          <span><i style="background:var(--bad)"></i>высоко</span>
-          <span><i style="background:var(--low)"></i>низко</span>
-          <span><i style="background:var(--bad);box-shadow:inset 0 0 0 2px var(--card)"></i><span id="legWrong">не та нота (точка рядом — что услышала) · </span><i style="background:var(--muted)"></i><span id="legMiss">не услышал</span></span>
-        </div>
-        <div class="sep"></div>
-        <div class="opts">
-          <label><span class="lt">Уровень:</span><select id="levelSel" autocomplete="off"></select></label>
-          <label><span class="lt">Ноты:</span><select id="zoomSel" autocomplete="off">
-            <option value="1">обычные</option><option value="1.25">крупные</option><option value="1.5">очень крупные</option></select></label>
-          <label class="chk"><input type="checkbox" id="showFing" checked>цифры пальцев</label>
-          <label class="chk"><input type="checkbox" id="showNames">названия нот</label>
-          <label class="chk" id="showLyrLab" hidden><input type="checkbox" id="showLyr" checked>слова</label>
-        </div>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="legend" id="legend">
+        <span><i style="background:var(--ok)"></i>чисто</span>
+        <span><i style="background:var(--bad)"></i>высоко</span>
+        <span><i style="background:var(--low)"></i>низко</span>
+        <span><i style="background:var(--bad);box-shadow:inset 0 0 0 2px var(--card)"></i><span id="legWrong">не та нота (точка рядом — что услышала) · </span><i style="background:var(--muted)"></i><span id="legMiss">не услышал</span></span>
       </div>
     </div>
   </div>
@@ -1215,7 +1318,7 @@ function parseText(text){
 /* === рисуем ноты === */
 // Логические единицы: расстояние между линейками стана GAP. Строка нот — отдельный <svg>; «Ноты: крупные» меняет ZOOM —
 // рисуем в тех же единицах, а на экране всё увеличивается (viewBox уже, высота больше).
-const GAP=12, STAFF=GAP*4, TOP=40, FING_Y=12;
+const GAP=12, STAFF=GAP*4, TOP=40, FING_Y=18;
 const LINE_STEPS=[30,32,34,36,38];            // ми1 соль1 си1 ре2 фа2
 const yOf=step=>TOP+STAFF-(step-30)*(GAP/2);
 const SVGNS='http://www.w3.org/2000/svg';
@@ -1484,6 +1587,15 @@ function playheadAt(noteIdx, frac){   // положение бегунка вн�
 /* ---- гриф: куда ставить палец и где он сейчас ---- */
 const FB={top:40, len:244, x:[18,38,58,78], maxD:8};
 function fbY(d){ return FB.top+FB.len*(1-Math.pow(2,-d/12))/(1-Math.pow(2,-FB.maxD/12)); }
+// гриф вытягивается по свободной высоте (ширина рисунка всегда 96 единиц): места пальцев дальше друг от друга и крупнее
+function fitBoard(){
+  const svg=document.getElementById('board'); if(!svg) return false;
+  const w=svg.clientWidth, h=svg.clientHeight; if(!w||!h) return false;
+  const H=Math.round(Math.max(300, Math.min(96*h/w, 640)));
+  if(FB.top+FB.len+16===H) return false;
+  FB.len=H-FB.top-16; svg.setAttribute('viewBox','0 0 96 '+H);
+  return true;
+}
 function drawBoard(target, midiF){
   const svg=document.getElementById('board'), tip=document.getElementById('fbTip');
   if(!svg) return;
@@ -1637,7 +1749,7 @@ if(DEBUG){
   dbgEl=document.createElement('div');
   dbgEl.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;padding:6px 10px;background:#222;color:#fff;font:13px/1.35 ui-monospace,Menlo,monospace';
   dbgEl.textContent='проверка: нажми «Начать» и сыграй открытую ля';
-  document.body.appendChild(dbgEl); document.body.style.paddingBottom='70px';
+  document.body.appendChild(dbgEl); document.body.style.paddingBottom='70px'; document.documentElement.style.setProperty('--dbg','70px');
 }
 function debugFrame(p){
   dbgN++;
@@ -1646,7 +1758,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v9 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v10 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
@@ -2023,7 +2135,7 @@ function updateTarget(){
   const t=piece.notes[Math.min(idx,piece.notes.length-1)];
   if(!t) return;
   document.getElementById('targetNote').innerHTML=
-    t.ru+'<small>'+t.how+' · нота '+(idx+1)+' из '+piece.notes.length+'</small>';
+    '<b'+(t.ru.length>4? ' class="long"' : '')+'>'+t.ru+'</b><small><span class="how">'+t.how+'</span><i> · </i><span>нота '+(idx+1)+' из '+piece.notes.length+'</span></small>';
   document.getElementById('wantNote').textContent=t.ru;
   drawBoard(t,null);
   document.getElementById('needHz').textContent=(440*Math.pow(2,(t.midi-69)/12)).toFixed(1)+' Гц';
@@ -2219,9 +2331,9 @@ function openTuner(back){
   stop(); tuneBack=back||(screenNow==='play'?'play':'home');
   tuneOk=[false,false,false,false]; tuneSel=null; tuneIdx=-1; tuneHold=0;
   clearTimeout(tuneWait); tuneWait=null; tuneBox('');
-  document.getElementById('tNote').textContent='—'; document.getElementById('tHz').textContent=T_HZ;
+  document.getElementById('tNote').textContent=''; document.getElementById('tHz').textContent=T_HZ;
   document.getElementById('tNeedle').classList.remove('live','ok');
-  renderTuner(); tuneTip('');
+  renderTuner(); tuneTip('Нажми «Начать» и проведи смычком по открытой струне — ровно и долго.');
   showScreen('tune');
 }
 function closeTuner(){
@@ -2282,7 +2394,7 @@ function showScreen(name){
   for(const s of ['tune','home','play']) document.getElementById('scr'+s[0].toUpperCase()+s.slice(1)).hidden= s!==name;
   scrollTo(0,0);
   if(name==='home') renderHome();
-  if(name==='play' && piece){ render(); updateTarget(); scrollToCurrent(true); }
+  if(name==='play' && piece){ fitBoard(); render(); updateTarget(); scrollToCurrent(true); }
 }
 
 function starsHtml(n){ return `<span class="stars s${n||0}"><i>★</i><i>★</i><i>★</i></span>`; }
@@ -2449,7 +2561,8 @@ setLevel(store.get('level', oldLevel));
 
 // размер нот, цифры пальцев, слова
 const zoomSel=document.getElementById('zoomSel');
-zoomSel.value=String(store.get('zoom',1)); ZOOM=+zoomSel.value||1;
+// iPad стоит на пюпитре дальше, чем книга с нотами, — там по умолчанию «крупные» (выбор запоминается)
+zoomSel.value=String(store.get('zoom', IOS && Math.min(screen.width,screen.height)>=700? 1.25 : 1)); ZOOM=+zoomSel.value||1;
 zoomSel.onchange=()=>{ ZOOM=+zoomSel.value||1; store.set('zoom',ZOOM); render(); scrollToCurrent(true); };
 const fingChk=document.getElementById('showFing'); fingChk.checked=store.get('fing',true); SHOW_FING=fingChk.checked;
 fingChk.onchange=()=>{ SHOW_FING=fingChk.checked; store.set('fing',SHOW_FING); render(); };
@@ -2560,6 +2673,8 @@ document.getElementById('txtGo').onclick=()=>{
 /* === старт === */
 let rt=null;
 addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(screenNow==='play'){ render(); scrollToCurrent(true); } },150); });
+function refitBoard(){ if(fitBoard() && piece && screenNow==='play' && !running) drawBoard(piece.notes[Math.min(idx,piece.notes.length-1)],null); }
+if(window.ResizeObserver) new ResizeObserver(refitBoard).observe(document.getElementById('board')); else addEventListener('resize',()=>setTimeout(refitBoard,200));
 addEventListener('error',e=>{ if(DEBUG && dbgEl) dbgEl.textContent='ошибка: '+e.message; });
 setUiMode(store.get('uimode','learn'), true);
 renderHome();
