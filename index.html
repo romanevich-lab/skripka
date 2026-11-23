@@ -2291,7 +2291,6 @@ let tuneSel=null, tuneIdx=-1, tuneHold=0, tuneOk=[false,false,false,false], tune
 let tuneMute=0;                        // до этого времени звучит струна по нажатию на неё — её не засчитываем
 let tuneBack='home';                   // куда вернуться после настройки
 let tuneRevive=0;                      // сколько раз настройка сама включала замолчавший микрофон заново
-const tuneHearing=()=>running && mode==='tune';
 function renderTuner(){
   const box=document.getElementById('tStrings'); box.innerHTML='';
   TSTR.forEach((t,i)=>{
