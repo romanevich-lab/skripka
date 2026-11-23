@@ -9,13 +9,13 @@
 <style>
   :root{
     --bg:#f6f5f2; --card:#fff; --ink:#1d1c1a; --muted:#6f6b64; --line:#d9d5cd; --soft:#edeae4;
-    --accent:#2f6fed; --ok:#1f9e5a; --warn:#d99000; --bad:#d2412f; --low:#7b4fd6; --star:#e8a900;
+    --accent:#2f6fed; --ok:#1f9e5a; --warn:#d99000; --warnInk:#a86200; --bad:#d2412f; --low:#7b4fd6; --star:#e8a900;
     --ok45:rgba(31,158,90,.45); --ok50:rgba(31,158,90,.5); --warn35:rgba(217,144,0,.35); --accent10:rgba(47,111,237,.1); --accent20:rgba(47,111,237,.2);
     --shadow:0 2px 10px rgba(0,0,0,.08);
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#14140f; --card:#1e1e19; --ink:#f0eee8; --muted:#a09a90; --line:#3a3931; --soft:#2a2a24;
-           --accent:#6f9dff; --ok:#3fbf7d; --warn:#e5aa2a; --bad:#f0685a; --low:#a88cf5; --star:#f0bb2a;
+           --accent:#6f9dff; --ok:#3fbf7d; --warn:#e5aa2a; --warnInk:#f0b34a; --bad:#f0685a; --low:#a88cf5; --star:#f0bb2a;
            --ok45:rgba(63,191,125,.45); --ok50:rgba(63,191,125,.5); --warn35:rgba(229,170,42,.35); --accent10:rgba(111,157,255,.12); --accent20:rgba(111,157,255,.25);
            --shadow:0 2px 10px rgba(0,0,0,.35); }
   }
@@ -217,51 +217,49 @@
   .opts select,.sel{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;
                padding:7px 10px;font:inherit;font-size:14px;cursor:pointer;min-height:38px}
 
-  /* настройка скрипки */
-  .tuner .thead{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 14px;margin-bottom:12px}
-  .tuner .thead b{font-size:18px}
-  .tuner .thead span{color:var(--muted);font-size:14px}
-  .tstrings{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .tchip{border:2px solid var(--line);background:transparent;color:var(--ink);border-radius:12px;padding:8px 4px;
-         cursor:pointer;text-align:center;line-height:1.2}
-  .tchip b{display:block;font-size:20px}
-  .tchip small{color:var(--muted);font-size:12px}
-  .tchip.on{border-color:var(--accent);background:var(--accent10)}
-  .tchip.sel{box-shadow:inset 0 0 0 2px var(--accent)}
-  .tchip.ok{border-color:var(--ok);background:var(--ok);color:#fff}
-  .tchip.ok small{color:#fff;opacity:.85}
-  .tchip.ok b::after{content:' ✓'}
-  .tpanel{position:relative;margin-top:16px}
-  .tokbox{position:absolute;inset:-8px;border-radius:12px;background:var(--ok);color:#fff;display:flex;flex-direction:column;
-          align-items:center;justify-content:center;text-align:center;opacity:0;pointer-events:none;transition:opacity .15s}
-  .tokbox b{font-size:34px;line-height:1.1}
-  .tokbox span{font-size:17px;font-weight:600}
-  .tpanel.done .tokbox{opacity:1}
-  .tnow{display:flex;align-items:baseline;gap:12px;margin:0;flex-wrap:wrap}
-  .tnow .tbig{font-size:40px;font-weight:700;line-height:1;min-height:1em;color:var(--ink)}
-  .tnow span{color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
-  #tHz{min-height:1.45em}
-  /* картинка: подставка, струны, подгрифок с четырьмя винтиками (машинками); у нужного — стрелка, в какую сторону крутить */
-  .thero{display:inline-flex;align-items:center;gap:14px}
-  #tPic{height:52px;width:auto;flex:none;overflow:visible;display:block}
-  .tnow .tpicbox{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none}
-  .tnow .tpicbox small{font-size:11px;color:var(--muted);white-space:nowrap}
-  .tp-bridge{fill:#c9b48a} .tp-str{stroke:var(--muted);stroke-width:1.6} .tp-str.on{stroke:var(--accent);stroke-width:3.2}
-  .tp-tail{fill:#2b2620;stroke:var(--line);stroke-width:1.5}
-  .tp-screw{fill:#cfc8b8;stroke:#8a8273;stroke-width:1.5} .tp-slot{stroke:#5b554a;stroke-width:2.2;stroke-linecap:round}
-  .tp-screw.on{fill:var(--accent);stroke:#fff;stroke-width:2.5} .tp-screw.ok{fill:var(--ok);stroke:#fff;stroke-width:2.5}
-  .tp-slot.on{stroke:#fff}
-  .tp-arrow{fill:none;stroke:var(--warn);stroke-width:5.5;stroke-linecap:round} .tp-head{fill:var(--warn)}
-  .tp-halo{fill:none;stroke:var(--card);stroke-width:10;stroke-linecap:round}
-  .tmeter{position:relative;height:40px;margin-top:10px;border-radius:8px;overflow:hidden;
-          background:linear-gradient(90deg,var(--line) 0%,var(--line) 45%, var(--ok50) 45%,var(--ok50) 55%, var(--line) 55%,var(--line) 100%)}
-  .tmeter i{position:absolute;top:0;bottom:0;left:50%;width:5px;margin-left:-2.5px;background:var(--ink);border-radius:2px;
-            transition:left .06s linear;opacity:.15}
-  .tmeter i.live{opacity:1} .tmeter i.ok{background:var(--ok)}
-  .tmeter u{position:absolute;top:0;bottom:0;left:50%;width:1px;background:var(--ink);opacity:.35}
-  .tlab{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:4px}
-  .ttip{font-size:16px;font-weight:600;min-height:48px;margin:12px 0 4px}
-  .ttip.ok{color:var(--ok)} .ttip.move{color:var(--warn)}
+  /* настройка скрипки — по образцу ведущих тюнеров (GuitarTuna, Fender Tune, Simply Tuner, LikeTones):
+     шкала со стрелкой и нотой посередине, под ней короткая подсказка, ниже — низ скрипки: подставка, струны, винтики;
+     кнопки струн стоят прямо над своими струнами. Шрифт — системный (Apple: SF Pro, нота — SF Pro Rounded), без «чёрного» жирного. */
+  .ttop{flex-wrap:nowrap} .ttop h1{font-size:24px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+  .tskip{border:0;background:none;color:var(--accent);font-size:17px;font-weight:500;padding:8px 2px;min-height:44px;cursor:pointer}
+  .tuner{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .tleft{width:100%;display:flex;flex-direction:column;align-items:center}
+  .tgauge{position:relative;width:100%;max-width:560px}
+  #tGauge{display:block;width:100%;height:auto;overflow:visible}
+  .tg-track{fill:none;stroke:var(--line);stroke-width:2}
+  .tg-zone{fill:none;stroke:var(--ok);stroke-opacity:.2;stroke-width:28}
+  .tg-tick{stroke:var(--muted);stroke-opacity:.4;stroke-width:2;stroke-linecap:round}
+  .tg-tick.m{stroke-opacity:.75;stroke-width:3}
+  .tg-tick.z{stroke:var(--ok);stroke-opacity:1;stroke-width:4}
+  .tg-lab{fill:var(--muted);font-size:19px;font-weight:500}
+  .tndl{transform-origin:200px 250px;transition:transform .09s linear,opacity .25s;opacity:.15}
+  .tndl line{stroke:var(--ink);stroke-width:7;stroke-linecap:round} .tndl circle{fill:var(--ink)}
+  .tndl.live{opacity:1}
+  .tndl.ok line{stroke:var(--ok)} .tndl.ok circle{fill:var(--ok)}
+  .tnote{font-family:ui-rounded,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-size:92px;font-weight:500;fill:var(--ink)}
+  .tgauge.ok .tnote{fill:var(--ok)}
+  .thz{font-size:24px;font-weight:500;fill:var(--muted);font-variant-numeric:tabular-nums}
+  .tokbox{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;
+          background:var(--bg);opacity:0;pointer-events:none;transition:opacity .15s}
+  .tokbox i{width:76px;height:76px;border-radius:50%;background:var(--ok);color:#fff;font-style:normal;font-size:44px;font-weight:700;
+            display:flex;align-items:center;justify-content:center;line-height:1;margin-bottom:6px}
+  .tokbox b{font-size:26px;font-weight:700;color:var(--ok);line-height:1.15} .tokbox span{font-size:17px;color:var(--muted);font-weight:500}
+  .tgauge.done .tokbox{opacity:1}
+  .ttip{font-size:17px;font-weight:500;line-height:1.35;min-height:2.7em;margin:4px 0 2px;text-align:center;max-width:640px;color:var(--ink)}
+  .ttip.ok{color:var(--ok)} .ttip.move{color:var(--warnInk)}
+  .tviolin{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
+  .tvbox{position:relative;width:100%;max-width:440px}
+  #tPic{display:block;width:100%;height:auto;filter:drop-shadow(0 8px 20px rgba(70,35,10,.28))}
+  .tstrings{position:absolute;top:2.6%;left:25%;width:50%;display:grid;grid-template-columns:repeat(4,1fr);justify-items:center}
+  .tchip{width:94%;aspect-ratio:1/1;border-radius:50%;border:0;padding:0;cursor:pointer;position:relative;
+         background:rgba(255,255,255,.95);color:#1d1c1a;font-size:15px;font-weight:600;line-height:1;
+         display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+  .tchip b{font-weight:600}
+  .tchip.on{background:var(--accent);color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.9),0 2px 8px rgba(0,0,0,.3)}
+  .tchip.ok:not(.sel){background:var(--ok);color:#fff}                       /* настроенная — зелёная, пока её не выбрали заново */
+  .tchip.ok::after{content:'✓';position:absolute;top:-5px;right:-5px;width:22px;height:22px;border-radius:50%;background:#fff;color:var(--ok);
+         font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+  .tcap{color:var(--muted);font-size:14px;text-align:center;line-height:1.3}
 
   /* окна поверх */
   .modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
@@ -359,25 +357,23 @@
     .legend{font-size:15px} .legend i{width:14px;height:14px}
     .tempo input[type=number]{width:76px;font-size:19px;min-height:44px} .tempo .step{width:48px;font-size:22px}
 
-    /* настройка скрипки */
-    #scrTune>.wrap{max-width:920px}
-    #scrTune .top{flex:none}
-    #scrTune .tuner{flex:1;min-height:0;margin-bottom:0;padding:22px;display:flex;flex-direction:column}
-    .tuner .thead{margin-bottom:16px} .tuner .thead b{font-size:24px} .tuner .thead span{font-size:17px}
-    .tstrings{gap:12px}
-    .tchip{padding:20px 4px;border-radius:16px}
-    .tchip b{font-size:34px} .tchip small{font-size:15px}
-    .tpanel{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;margin-top:18px}
-    .tnow{flex-direction:column;align-items:center;text-align:center;gap:8px}
-    .tnow .tbig{font-size:clamp(96px,17vh,190px)}
-    .thero{gap:44px} #tPic{height:clamp(120px,19vh,210px)}
-    .tnow .tpicbox{gap:10px} .tnow .tpicbox small{font-size:18px}
-    .tnow span{font-size:20px} #tHz{font-size:26px;font-weight:600}
-    .tmeter{height:clamp(64px,9vh,104px);margin-top:22px;border-radius:14px}
-    .tmeter i{width:10px;margin-left:-5px;border-radius:5px}
-    .tlab{font-size:22px;margin-top:8px}
-    .tokbox{inset:0;border-radius:18px} .tokbox b{font-size:64px} .tokbox span{font-size:30px}
-    .ttip{font-size:26px;line-height:1.3;min-height:104px;margin:18px 0 8px;text-align:center}
+    /* настройка скрипки: весь экран без прокрутки; стоя — сверху шкала, снизу скрипка; лёжа — рядом */
+    #scrTune>.wrap{max-width:1180px}
+    #scrTune .top{flex:none;margin-bottom:0}
+    .ttop h1{font-size:34px} .tskip{font-size:20px}
+    #scrTune .tuner{flex:1;min-height:0;justify-content:space-evenly;gap:10px}
+    .tgauge{width:min(100%,600px,58vh);max-width:none}
+    .tvbox{width:min(100%,500px,46vh);max-width:none}
+    .tchip{font-size:19px}
+    .ttip{font-size:24px}
+    .tcap{font-size:16px}
+    .tokbox i{width:104px;height:104px;font-size:60px} .tokbox b{font-size:38px} .tokbox span{font-size:22px}
+    @media (min-aspect-ratio:1/1){
+      #scrTune .tuner{flex-direction:row;justify-content:center;gap:clamp(24px,5vw,64px)}
+      .tleft{flex:1.2;max-width:640px} .tviolin{flex:1;max-width:500px}
+      .tgauge{width:100%}
+      .tvbox{width:min(100%,62vh)}
+    }
 
     /* что играть */
     #scrHome>.wrap.narrow{max-width:1180px}
@@ -399,17 +395,29 @@
 <!-- ===== экран 1: настройка скрипки (приложение начинается с неё — так просил Константин) ===== -->
 <section class="screen" id="scrTune">
   <div class="wrap narrow">
-    <header class="top"><h1>Скрипка</h1><div class="hbtns"><button class="pick" id="tDone">Пропустить настройку →</button></div></header>
-    <div class="card tuner" id="tuner">
-      <div class="thead"><b>Настройка скрипки</b></div>
-      <div class="tstrings" id="tStrings"></div>
-      <div class="tpanel" id="tPanel">
-        <div class="tnow"><span class="thero"><span class="tbig" id="tNote"></span><span class="tpicbox"><svg id="tPic" viewBox="0 0 200 156" aria-hidden="true"></svg><small>винтики внизу струн</small></span></span><span id="tHz">какую струну играешь, программа поймёт сама; нажми на струну — услышишь, как она звучит</span></div>
-        <div class="tmeter"><u></u><i id="tNeedle"></i></div>
-        <div class="tlab"><span>ниже</span><span>чисто</span><span>выше</span></div>
-        <div class="tokbox"><b id="tOkTitle"></b><span id="tOkSub"></span></div>
+    <header class="top ttop"><h1>Настройка скрипки</h1><div class="hbtns"><button class="tskip" id="tDone">Пропустить →</button></div></header>
+    <!-- как у ведущих тюнеров (GuitarTuna, Fender Tune, Simply Tuner, LikeTones): одна шкала со стрелкой и нотой посередине,
+         короткая подсказка, ниже — нарисованная часть инструмента, у каждой струны — кнопка с её названием -->
+    <div class="tuner" id="tuner">
+      <div class="tleft">
+        <div class="tgauge" id="tPanel">
+          <svg id="tGauge" viewBox="0 0 400 236" aria-hidden="true">
+            <g id="tScale"></g>
+            <g id="tNeedle" class="tndl"><line x1="200" y1="100" x2="200" y2="34"/><circle cx="200" cy="34" r="9"/></g>
+            <text id="tNote" class="tnote" x="200" y="190" text-anchor="middle"></text>
+            <text id="tHz" class="thz" x="200" y="228" text-anchor="middle">сыграй любую струну</text>
+          </svg>
+          <div class="tokbox"><i>✓</i><b id="tOkTitle"></b><span id="tOkSub"></span></div>
+        </div>
+        <div class="ttip" id="tTip"></div>
       </div>
-      <div class="ttip" id="tTip"></div>
+      <div class="tviolin">
+        <div class="tvbox">
+          <svg id="tPic" viewBox="0 0 400 340" aria-hidden="true"></svg>
+          <div class="tstrings" id="tStrings"></div>
+        </div>
+        <small class="tcap">винтики внизу струн · нажми на струну — услышишь её</small>
+      </div>
     </div>
   </div>
 </section>
@@ -2300,7 +2308,7 @@ function renderTuner(){
     b.onclick=()=>{                     // нажал на струну — она звучит, и настраиваем её
       clearTimeout(tuneWait); tuneWait=null; tuneHold=0;
       tuneSel=i; tuneIdx=i;
-      tuneBox(''); renderTuner(); document.getElementById('tNeedle').classList.remove('live','ok');
+      tuneBox(''); renderTuner(); tuneNeedle(null);
       document.getElementById('tNote').textContent=t.n;
       document.getElementById('tHz').textContent='';
       tunePlay();
@@ -2309,26 +2317,101 @@ function renderTuner(){
   });
   tunePic(tuneIdx,0);
 }
-// st: 0 — просто показать, какая машинка; -1 — подтянуть (по часовой); 1 — ослабить (против часовой); 2 — настроена
+/* Шкала: дуга от «ниже» (−50) до «выше» (+50), зелёная зона — «чисто» (±TUNE_OK), стрелка поворачивается вокруг точки под шкалой. */
+const G_CX=200, G_CY=250, G_R=212, G_ANG=55;          // центр поворота, радиус дуги, угол края шкалы (градусы)
+function drawGauge(){
+  const P=(c,r)=>{ const a=c/50*G_ANG*Math.PI/180; return [(G_CX+r*Math.sin(a)).toFixed(1),(G_CY-r*Math.cos(a)).toFixed(1)]; };
+  const arc=(c0,c1,r)=>{ const a=P(c0,r), b=P(c1,r); return `M${a[0]} ${a[1]} A${r} ${r} 0 0 1 ${b[0]} ${b[1]}`; };
+  let o=`<path d="${arc(-TUNE_OK,TUNE_OK,G_R-14)}" class="tg-zone"/><path d="${arc(-50,50,G_R)}" class="tg-track"/>`;
+  for(let c=-50;c<=50;c+=5){
+    const L= c===0? 34 : c%10===0? 20 : 11, a=P(c,G_R), b=P(c,G_R-L);
+    o+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" class="tg-tick${c===0?' z':c%10===0?' m':''}"/>`;
+  }
+  const l=P(-50,G_R), r=P(50,G_R);
+  o+=`<text x="${l[0]}" y="${+l[1]+30}" class="tg-lab" text-anchor="middle">ниже</text><text x="${r[0]}" y="${+r[1]+30}" class="tg-lab" text-anchor="middle">выше</text>`;
+  document.getElementById('tScale').innerHTML=o;
+}
+drawGauge();
+function tuneNeedle(c){                // c — сколько мимо (−50…50); null — звука нет: стрелка бледнеет там, где была
+  const g=document.getElementById('tNeedle'), ok= c!=null && Math.abs(c)<=TUNE_OK;
+  document.getElementById('tPanel').classList.toggle('ok',ok);
+  if(c==null){ g.classList.remove('live','ok'); return; }
+  g.classList.add('live'); g.classList.toggle('ok',ok);
+  g.style.transform=`rotate(${(Math.max(-50,Math.min(50,c))/50*G_ANG).toFixed(2)}deg)`;
+}
+
+/* Картинка: низ скрипки крупно, как его видит играющий, — дека с волокнами, эфы, подставка, четыре струны,
+   подгрифок с четырьмя винтиками. Кнопки струн (HTML) стоят над верхними концами струн: 25%…75% ширины. */
+const PIC_TOP=[125,175,225,275], PIC_BR=[129,176,224,271], PIC_TU=[136,178,222,264], PIC_SW=[4.6,3.8,3.1,2.3], PIC_BY=121, PIC_TY=246;
+const PIC_BASE=(()=>{
+  let o=`<defs>
+    <clipPath id="tpClip"><rect width="400" height="340" rx="30"/></clipPath>
+    <linearGradient id="tpWood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e39a45"/><stop offset=".55" stop-color="#bd6824"/><stop offset="1" stop-color="#8e4115"/></linearGradient>
+    <radialGradient id="tpGlow" cx=".32" cy=".2" r=".75"><stop offset="0" stop-color="#ffe2b0" stop-opacity=".5"/><stop offset="1" stop-color="#ffe2b0" stop-opacity="0"/></radialGradient>
+    <linearGradient id="tpEbony" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a423c"/><stop offset=".35" stop-color="#211c19"/><stop offset="1" stop-color="#0e0c0b"/></linearGradient>
+    <linearGradient id="tpMaple" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7e8c4"/><stop offset="1" stop-color="#d9b87c"/></linearGradient>
+    <radialGradient id="tpMetal" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#cfd2d6"/><stop offset="1" stop-color="#7c8086"/></radialGradient>
+    <linearGradient id="tpLever" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6d7177"/><stop offset=".45" stop-color="#c9ccd1"/><stop offset="1" stop-color="#5d6167"/></linearGradient>
+    <linearGradient id="tpStr" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9da1a6"/><stop offset=".5" stop-color="#f4f5f6"/><stop offset="1" stop-color="#9da1a6"/></linearGradient>
+    <filter id="tpBlur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs><g clip-path="url(#tpClip)">
+  <rect width="400" height="340" fill="url(#tpWood)"/>`;
+  let seed=7; const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;     // волокна ели — прямые, вдоль струн
+  for(let x=4;x<400;x+=5+rnd()*9) o+=`<line x1="${x.toFixed(1)}" y1="0" x2="${(x+rnd()*6-3).toFixed(1)}" y2="340" stroke="${rnd()<.75?'#5a2508':'#ffd9a0'}" stroke-opacity="${(.06+rnd()*.08).toFixed(2)}" stroke-width="${(.8+rnd()*1.6).toFixed(1)}"/>`;
+  o+=`<rect width="400" height="340" fill="url(#tpGlow)"/>`;
+  // эфа: тонкая сверху и снизу, шире посередине, с «глазками» на концах и двумя зарубками
+  const B=(t,a,b,c,d)=>(1-t)**3*a+3*(1-t)**2*t*b+3*(1-t)*t*t*c+t**3*d;
+  const D=(t,a,b,c,d)=>3*(1-t)**2*(b-a)+6*(1-t)*t*(c-b)+3*t*t*(d-c);
+  const X=[324,352,322,348], Y=[34,96,206,296], L=[], R=[];
+  for(let k=0;k<=40;k++){ const t=k/40, x=B(t,...X), y=B(t,...Y), dx=D(t,...X), dy=D(t,...Y), n=Math.hypot(dx,dy)||1, w=1.6+4.2*Math.sin(Math.PI*t)**1.5;
+    L.push(`${(x-dy/n*w).toFixed(1)} ${(y+dx/n*w).toFixed(1)}`); R.unshift(`${(x+dy/n*w).toFixed(1)} ${(y-dx/n*w).toFixed(1)}`); }
+  const mx=B(.5,...X), my=B(.5,...Y);
+  const fh=`<g fill="#2b1406"><path d="M${L.join(' L')} L${R.join(' L')} Z"/><circle cx="${X[0]}" cy="${Y[0]}" r="7.5"/><circle cx="${X[3]}" cy="${Y[3]}" r="10"/></g>
+    <path d="M${(mx-13).toFixed(1)} ${(my-3).toFixed(1)} L${(mx+13).toFixed(1)} ${(my+3).toFixed(1)}" stroke="#2b1406" stroke-width="2.6" stroke-linecap="round"/>`;
+  o+=fh+`<g transform="translate(400 0) scale(-1 1)">${fh}</g>`;                                       // эфы
+  o+=`<path d="M110 222 Q200 200 290 222 C288 266 272 314 254 352 L146 352 C128 314 112 266 110 222 Z" fill="#2a1205" opacity=".35" filter="url(#tpBlur)" transform="translate(3 7)"/>
+    <path d="M110 222 Q200 200 290 222 C288 266 272 314 254 352 L146 352 C128 314 112 266 110 222 Z" fill="url(#tpEbony)"/>
+    <path d="M114 222 Q200 202 286 222" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="2"/>`;   // подгрифок
+  o+=`<rect x="112" y="${PIC_BY-2}" width="176" height="14" rx="4" fill="#2a1205" opacity=".4" filter="url(#tpBlur)" transform="translate(2 8)"/>
+    <rect x="116" y="${PIC_BY+3}" width="24" height="12" rx="3" fill="#caa66a"/><rect x="260" y="${PIC_BY+3}" width="24" height="12" rx="3" fill="#caa66a"/>
+    <rect x="110" y="${PIC_BY-4}" width="180" height="11" rx="4" fill="url(#tpMaple)" stroke="#a5834a" stroke-width="1"/>`;   // подставка
+  return o;
+})();
+// st: 0 — просто показать, какой винтик; -1 — подтянуть (по часовой); 1 — ослабить (против часовой); 2 — настроена
 let tunePicKey='';
 function tunePic(i, st){
-  const key=i+':'+st; if(key===tunePicKey) return; tunePicKey=key;
+  const key=i+':'+st+':'+tuneOk.join(); if(key===tunePicKey) return; tunePicKey=key;
   const svg=document.getElementById('tPic'); if(!svg) return;
-  const X=[40,80,120,160], Y=98; let o='<rect x="14" y="12" width="172" height="7" rx="3" class="tp-bridge"/>';
-  X.forEach((x,k)=>{ o+=`<line x1="${x}" y1="0" x2="${x}" y2="${Y}" class="tp-str${k===i?' on':''}"/>`; });
-  o+='<path d="M20 80 H180 L152 154 H48 Z" class="tp-tail"/>';
-  X.forEach((x,k)=>{ const on=k===i; o+=`<circle cx="${x}" cy="${Y}" r="${on?13:9}" class="tp-screw${on?(st===2?' ok':' on'):''}"/>`;
-    o+= on && st===2? `<path d="M${x-6} ${Y} l4.5 5 l8 -10" class="tp-slot on" fill="none"/>` : `<line x1="${x-5}" y1="${Y}" x2="${x+5}" y2="${Y}" class="tp-slot${on?' on':''}"/>`; });
-  if(i>=0 && (st===-1||st===1)){
-    // дуга вокруг машинки: по часовой (подтянуть) или против часовой (ослабить), со стрелкой на конце
-    const cw=st===-1, r=25, cx=X[i], a0=(cw?135:45)*Math.PI/180, a1=(cw?45:135)*Math.PI/180;
-    const x0=cx+r*Math.cos(a0), y0=Y+r*Math.sin(a0), x1=cx+r*Math.cos(a1), y1=Y+r*Math.sin(a1);
-    const tx=(cw?-1:1)*Math.sin(a1), ty=(cw?1:-1)*Math.cos(a1), nx=Math.cos(a1), ny=Math.sin(a1);   // касательная и радиус в конце дуги
-    const d=`M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 1 ${cw?1:0} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
-    o+=`<path d="${d}" class="tp-halo"/><path d="${d}" class="tp-arrow"/>`;
-    o+=`<path d="M${(x1+tx*11).toFixed(1)} ${(y1+ty*11).toFixed(1)} L${(x1+nx*9-tx*2).toFixed(1)} ${(y1+ny*9-ty*2).toFixed(1)} L${(x1-nx*9-tx*2).toFixed(1)} ${(y1-ny*9-ty*2).toFixed(1)} Z" class="tp-head"/>`;
+  let o=PIC_BASE;
+  const line=k=>`M${PIC_TOP[k]} -4 L${PIC_BR[k]} ${PIC_BY} L${PIC_TU[k]} ${PIC_TY}`;
+  for(let k=0;k<4;k++){                                                                              // струны
+    o+=`<path d="${line(k)}" fill="none" stroke="#2a1205" stroke-opacity=".45" stroke-width="${PIC_SW[k]+1.5}" transform="translate(1.5 2.5)"/>`;
+    if(k===i) o+=`<path d="${line(k)}" fill="none" style="stroke:${st===2?'var(--ok)':'var(--accent)'}" stroke-opacity=".45" stroke-width="${PIC_SW[k]+9}" stroke-linejoin="round"/>`;
+    o+=`<path d="${line(k)}" fill="none" stroke="${k===i? '#fff' : k===0? '#c3c6ca' : '#e6e8ea'}" stroke-width="${PIC_SW[k]}" stroke-linejoin="round"/>`;
   }
-  svg.innerHTML=o;
+  for(let k=0;k<4;k++){                                                                              // винтики
+    const x=PIC_TU[k], y=PIC_TY;
+    o+=`<rect x="${x-10}" y="${y-4}" width="20" height="50" rx="8" fill="url(#tpLever)" stroke="#3a3d42" stroke-width="1"/>
+      <circle cx="${x}" cy="${y}" r="13.5" fill="url(#tpMetal)" stroke="#5d6167" stroke-width="1.2"/>
+      <circle cx="${x}" cy="${y}" r="11.2" fill="none" stroke="#6d7177" stroke-width="2" stroke-dasharray="1.6 2.2"/>
+      <circle cx="${x}" cy="${y}" r="3.2" fill="#55595f"/>`;
+  }
+  if(i>=0){
+    const x=PIC_TU[i], y=PIC_TY;
+    if(st===2) o+=`<circle cx="${x}" cy="${y}" r="16" style="fill:var(--ok)" stroke="#fff" stroke-width="3"/><path d="M${x-7} ${y} l5 5.5 l9 -11" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+    else o+=`<circle cx="${x}" cy="${y}" r="19" fill="none" style="stroke:var(--accent)" stroke-width="4.5"/>`;
+    if(st===-1||st===1){
+      // дуга вокруг винтика: по часовой (подтянуть) или против часовой (ослабить), со стрелкой на конце
+      const cw=st===-1, r=33, a0=(cw?150:30)*Math.PI/180, a1=(cw?30:150)*Math.PI/180;
+      const x0=x+r*Math.cos(a0), y0=y+r*Math.sin(a0), x1=x+r*Math.cos(a1), y1=y+r*Math.sin(a1);
+      const tx=(cw?-1:1)*Math.sin(a1), ty=(cw?1:-1)*Math.cos(a1), nx=Math.cos(a1), ny=Math.sin(a1);   // касательная и радиус в конце дуги
+      const d=`M${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 1 ${cw?1:0} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+      const head=`M${(x1+tx*13).toFixed(1)} ${(y1+ty*13).toFixed(1)} L${(x1+nx*11-tx*3).toFixed(1)} ${(y1+ny*11-ty*3).toFixed(1)} L${(x1-nx*11-tx*3).toFixed(1)} ${(y1-ny*11-ty*3).toFixed(1)} Z`;
+      o+=`<path d="${d}" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/><path d="${head}" fill="#fff" stroke="#fff" stroke-width="5" stroke-linejoin="round"/>
+        <path d="${d}" fill="none" stroke="#ff8a00" stroke-width="6.5" stroke-linecap="round"/><path d="${head}" fill="#ff8a00"/>`;
+    }
+  }
+  svg.innerHTML=o+'</g>';
 }
 function tuneTip(text,cls){ const el=document.getElementById('tTip'); el.textContent=text; el.className='ttip'+(cls?' '+cls:''); }
 function tuneBox(title,sub){
@@ -2337,15 +2420,15 @@ function tuneBox(title,sub){
 }
 function tuneDone(i){
   tuneOk[i]=true; tuneSel=null; tuneHold=0;
-  document.getElementById('tNeedle').classList.remove('live','ok');
+  tuneNeedle(null);
   renderTuner(); tuneTip('');
   clearTimeout(tuneWait); tuneWait=null;
   if(tuneOk.every(Boolean)) tuneIdle(i);
-  else { tuneBox('✓ Настроено',`струна «${TSTR[i].n}»`); tuneWait=setTimeout(()=>{ tuneWait=null; tuneIdle(i); },TUNE_SHOW); }
+  else { tuneBox('Настроено',`струна «${TSTR[i].n}»`); tuneWait=setTimeout(()=>{ tuneWait=null; tuneIdle(i); },TUNE_SHOW); }
 }
 function tuneIdle(from){
   if(tuneOk.every(Boolean)){
-    tuneBox('✓ Все струны настроены','можно играть!');
+    tuneBox('Все струны настроены','можно играть!');
     tuneTip('✓ Все четыре струны настроены — можно играть!','ok'); renderTuner();
     clearTimeout(tuneWait); tuneWait=setTimeout(()=>{ tuneWait=null; closeTuner(); },TUNE_END); return;
   }
@@ -2357,19 +2440,18 @@ function tuneIdle(from){
 }
 function tuneFrame(p){
   if(tuneWait || (tuneSel==null && tuneOk.every(Boolean))) return;
-  const nd=document.getElementById('tNeedle');
-  if(ctx.currentTime<tuneMute){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0); return; }
-  if(!p){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0); return; }
+  if(ctx.currentTime<tuneMute){ tuneNeedle(null); tuneHold=0; tunePic(tuneIdx,0); return; }
+  if(!p){ tuneNeedle(null); tuneHold=0; tunePic(tuneIdx,0); return; }
   const midiF=69+12*Math.log2(p.freq/440);
   const fold=d=>d-12*Math.round(d/12);
   let i=tuneSel;
   if(i==null){ let best=99; TSTR.forEach((t,k)=>{ const d=Math.abs(fold(midiF-t.m)); if(d<best){best=d;i=k;} });
-    if(best>2.5){ nd.classList.remove('live','ok'); tunePic(tuneIdx,0); tuneTip('Звук не похож на струну без пальцев. Проведи смычком по струне без пальцев.'); return; }
-    if(tuneOk[i]){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0);
+    if(best>2.5){ tuneNeedle(null); tunePic(tuneIdx,0); tuneTip('Звук не похож на струну без пальцев. Проведи смычком по струне без пальцев.'); return; }
+    if(tuneOk[i]){ tuneNeedle(null); tuneHold=0; tunePic(tuneIdx,0);
       tuneTip(`Струна «${TSTR[i].n}» уже настроена ✓ — теперь «${TSTR[tuneIdx].n}».`,'ok'); return; } }
   else {
     const k=TSTR.findIndex((t,j)=>j!==i && Math.abs(midiF-t.m)<=1.5);
-    if(k>=0){ nd.classList.remove('live','ok'); tuneHold=0; tunePic(tuneIdx,0);
+    if(k>=0){ tuneNeedle(null); tuneHold=0; tunePic(tuneIdx,0);
       document.getElementById('tHz').textContent='';
       tuneTip(`Звучит струна «${TSTR[k].n}», а выбрана «${TSTR[i].n}».`,'move'); return; }
   }
@@ -2377,8 +2459,7 @@ function tuneFrame(p){
   const t=TSTR[i], c=Math.round(fold(midiF-t.m)*100);
   document.getElementById('tNote').textContent=t.n;
   document.getElementById('tHz').textContent=offText(c);
-  nd.classList.add('live'); nd.style.left=(50+Math.max(-50,Math.min(50,c)))+'%';
-  nd.classList.toggle('ok',Math.abs(c)<=TUNE_OK);
+  tuneNeedle(c);
   tunePic(i, Math.abs(c)<=TUNE_OK? 2 : c<0? -1 : 1);
   if(Math.abs(c)<=TUNE_OK){
     if(++tuneHold>=45){ tuneDone(i); return; }
@@ -2426,7 +2507,7 @@ function openTuner(back){
   tuneOk=[false,false,false,false]; tuneSel=null; tuneIdx=-1; tuneHold=0; tuneRevive=0;
   clearTimeout(tuneWait); tuneWait=null; tuneBox('');
   document.getElementById('tNote').textContent=''; document.getElementById('tHz').textContent=T_HZ;
-  document.getElementById('tNeedle').classList.remove('live','ok');
+  tuneNeedle(null);
   renderTuner(); tuneTip(TUNE_TIP);
   showScreen('tune');
   tuneStart();
