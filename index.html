@@ -262,7 +262,6 @@
   .tlab{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-top:4px}
   .ttip{font-size:16px;font-weight:600;min-height:48px;margin:12px 0 4px}
   .ttip.ok{color:var(--ok)} .ttip.move{color:var(--warn)}
-  .tuner .btns{margin:8px 0 0}
 
   /* окна поверх */
   .modal{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto}
@@ -379,8 +378,6 @@
     .tlab{font-size:22px;margin-top:8px}
     .tokbox{inset:0;border-radius:18px} .tokbox b{font-size:64px} .tokbox span{font-size:30px}
     .ttip{font-size:26px;line-height:1.3;min-height:104px;margin:18px 0 8px;text-align:center}
-    .tuner .btns{justify-content:center;gap:14px}
-    .tuner .btns .act{min-height:64px;font-size:22px;padding:16px 34px}
 
     /* что играть */
     #scrHome>.wrap.narrow{max-width:1180px}
@@ -407,16 +404,12 @@
       <div class="thead"><b>Настройка скрипки</b></div>
       <div class="tstrings" id="tStrings"></div>
       <div class="tpanel" id="tPanel">
-        <div class="tnow"><span class="thero"><span class="tbig" id="tNote"></span><span class="tpicbox"><svg id="tPic" viewBox="0 0 200 156" aria-hidden="true"></svg><small>винтики внизу струн</small></span></span><span id="tHz">какую струну играешь, программа поймёт сама; можно выбрать нажатием</span></div>
+        <div class="tnow"><span class="thero"><span class="tbig" id="tNote"></span><span class="tpicbox"><svg id="tPic" viewBox="0 0 200 156" aria-hidden="true"></svg><small>винтики внизу струн</small></span></span><span id="tHz">какую струну играешь, программа поймёт сама; нажми на струну — услышишь, как она звучит</span></div>
         <div class="tmeter"><u></u><i id="tNeedle"></i></div>
         <div class="tlab"><span>ниже</span><span>чисто</span><span>выше</span></div>
         <div class="tokbox"><b id="tOkTitle"></b><span id="tOkSub"></span></div>
       </div>
       <div class="ttip" id="tTip"></div>
-      <div class="btns">
-        <button class="act" id="tListen">Начать</button>
-        <button class="act ghost" id="tPlay">▶ Послушать струну</button>
-      </div>
     </div>
   </div>
 </section>
@@ -1728,17 +1721,25 @@ function detectPitch(buf,sr){
 }
 
 /* === аудио === */
-let ctx=null, analyser=null, micStream=null, micSrc=null, buf=null, raf=null;
-async function ensureCtx(){
-  if(!ctx){
-    ctx=new (window.AudioContext||window.webkitAudioContext)();
-    analyser=ctx.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=0;
-    buf=new Float32Array(analyser.fftSize);
-    // iPad: звонок, Siri, другое приложение «прерывают» звук — как только можно, включаем обратно
-    ctx.onstatechange=()=>{ if(running && ctx.state!=='running' && ctx.state!=='closed') ctx.resume().catch(()=>{}); };
-  }
-  if(ctx.state==='suspended') await ctx.resume();
+let ctx=null, analyser=null, micStream=null, micSrc=null, buf=null, raf=null, micFixes=0;
+function newCtx(){                      // звук и «ухо» (анализатор) — заново; старый звук закрывается
+  if(ctx && ctx.close && ctx.state!=='closed') ctx.close().catch(()=>{});
+  const c=ctx=new (window.AudioContext||window.webkitAudioContext)();
+  analyser=c.createAnalyser(); analyser.fftSize=2048; analyser.smoothingTimeConstant=0;
+  buf=new Float32Array(analyser.fftSize);
+  // у нового звука часы с нуля — отметки времени по старым часам сбрасываем
+  tuneMute=0; sampleMute=0; floorT=0; otherT=-1; relS0=-1; relQ0=-1;
+  // iPad: звонок, Siri, другое приложение «прерывают» звук — как только можно, включаем обратно
+  c.onstatechange=()=>{ if(c===ctx && running && c.state!=='running' && c.state!=='closed') c.resume().catch(()=>{}); };
 }
+// Включить звук. Без нажатия на экран браузер может не дать (iPad даёт, пока работает микрофон, — WebKit 180680);
+// тогда resume() не кончается никогда — поэтому ждём не дольше полсекунды. 'interrupted' — так iPad называет прерванный звук.
+async function wakeCtx(){
+  if(ctx.state==='running') return true;
+  try{ await Promise.race([ctx.resume(), new Promise(r=>setTimeout(r,500))]); }catch(e){}
+  return ctx.state==='running';
+}
+async function ensureCtx(){ if(!ctx || ctx.state==='closed') newCtx(); await wakeCtx(); }
 // iPad/iPhone: без эхоподавления микрофон отдаёт звук тихо — для разбора усиливаем ×10 (тишина всё ещё ниже порога)
 const IOS=/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
 let MIC_GAIN=IOS? 10 : 1;
@@ -1752,10 +1753,25 @@ let deadFrames=0;                       // кадры, где из микроф�
 function checkDead(){
   if(mode==='demo') return;
   for(let k=0;k<buf.length;k++) if(buf[k]!==0){ deadFrames=0; return; }
-  if(++deadFrames!==120) return;        // ~2 с полной тишины — звук до программы не доходит
+  if(++deadFrames!==120) return;        // ~2 с полной тишины посреди слушания — звук перестал доходить
+  if(mode==='tune'){ if(tuneRevive++<3) tuneStart(); else tuneTip(micDeadMsg(),'move'); return; }   // настройка включает микрофон заново сама
   if(ctx.state!=='running') ctx.resume().catch(()=>{});
-  const msg='Микрофон молчит — звук не доходит до программы. Нажми «Стоп» и начни снова; не поможет — закрой вкладку и открой сайт заново.';
-  if(mode==='tune') tuneTip(msg,'move'); else setStatus(msg,'bad');
+  setStatus('Микрофон замолчал. Нажми «Стоп», потом «Начать» — программа включит его заново.','bad');
+}
+function micDeadMsg(){
+  return 'Микрофон включён, но звука нет. '+(location.protocol==='app:'? 'Закрой «Скрипку» и открой снова.' : 'Закрой вкладку и открой сайт снова.');
+}
+const MIC_BUSY='Микрофон сейчас занят — звонком или другим приложением. Как только освободится, начну слушать.';
+const MIC_WAIT=1500;                    // столько мс ждём первый звук из микрофона, прежде чем собрать звук заново
+// Идёт ли из микрофона хоть что-то, кроме ровных нулей: живой микрофон всегда немного шумит.
+function soundFlows(gone, wait){
+  const t0=performance.now();
+  return new Promise(res=>{ (function tick(){
+    if(gone()) return res(false);
+    readMic(); for(let k=0;k<buf.length;k++) if(buf[k]!==0) return res(true);
+    if(performance.now()-t0>=wait) return res(false);
+    setTimeout(tick,40);
+  })(); });
 }
 
 /* === адрес с ?debug: внизу строка с цифрами — чтобы понять, что не так на чужом устройстве === */
@@ -1764,7 +1780,7 @@ let dbgEl=null, dbgN=0, dbgPeak=0, dbgT=0, dbgMax=0;
 if(DEBUG){
   dbgEl=document.createElement('div');
   dbgEl.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;padding:6px 10px;background:#222;color:#fff;font:13px/1.35 ui-monospace,Menlo,monospace';
-  dbgEl.textContent='проверка: нажми «Начать» и сыграй струну ля без пальцев';
+  dbgEl.textContent='проверка: сыграй струну ля без пальцев';
   document.body.appendChild(dbgEl); document.body.style.paddingBottom='70px'; document.documentElement.style.setProperty('--dbg','70px');
 }
 function debugFrame(p){
@@ -1774,7 +1790,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v14 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v15 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · пересобран ${micFixes} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
@@ -1785,7 +1801,7 @@ let stable=[];
 function loop_(){
   raf=requestAnimationFrame(loop_);
   if(!running) return;
-  readMic(); checkDead();
+  readMic(); checkDead(); if(!running) return;   // настройка могла сама выключить замолчавший микрофон, чтобы включить заново
   const p=detectPitch(buf,ctx.sampleRate);
   if(DEBUG) debugFrame(p);
   if(mode==='tune'){ tuneFrame(p); return; }
@@ -2184,26 +2200,60 @@ function summary(a,b){
 
 /* === запуск / стоп === */
 let micReq=0;
-async function openMic(){
-  const my=++micReq;
+// Включает микрофон и возвращается, только когда звук из него правда доходит до программы.
+// Сначала микрофон, потом звук: пока микрофон работает, iPad разрешает звук без нажатия (WebKit 180680), а звук,
+// начатый раньше микрофона, на iPad бывает глухим или «прерванным» — анализатор тогда получает одни нули
+// (WebKit 239996, 273511). Если звук не идёт — звук собирается заново, третий раз — и с новым микрофоном.
+// Ответ: null — слушаем; 'cancel' — отменено; 'tap' — браузер ждёт касания экрана; иначе — текст ошибки.
+async function openMic(onWait){
+  const my=++micReq, gone=()=>my!==micReq;
+  const getMic=()=>navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+  let s=null, src=null;
+  const cancel=()=>{                     // отменено (закрыли настройку, «Стоп», новый запуск) — свой микрофон гасим сами
+    if(src){ try{ src.disconnect(); }catch(e){} if(micSrc===src) micSrc=null; }
+    if(s){ s.getTracks().forEach(t=>t.stop()); if(micStream===s) micStream=null; }
+    return 'cancel';
+  };
   try{
-    await ensureCtx();
-    const s=await navigator.mediaDevices.getUserMedia({audio:{
-      echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
-    if(my!==micReq){ s.getTracks().forEach(t=>t.stop()); return 'cancel'; }
-    micStream=s;
-    micSrc=ctx.createMediaStreamSource(micStream);
-    micSrc.connect(analyser);
-    if(ctx.state!=='running') ctx.resume().catch(()=>{});   // iPad: после разрешения микрофона звук бывает «на паузе»
-    deadFrames=0;
-    return null;
-  }catch(e){ return my!==micReq? 'cancel' : 'Не получилось включить микрофон: '+e.message; }
+    let why='';
+    for(let k=0;k<3;k++){
+      if(!s || k===2){
+        if(s){ s.getTracks().forEach(t=>t.stop()); if(micStream===s) micStream=null; }
+        s=await getMic();
+        if(gone()) return cancel();
+        micStream=s;
+      }
+      if(k>0 || !ctx || ctx.state==='closed') newCtx();
+      if(!await wakeCtx()){ if(gone()) return cancel(); why=ctx.state; if(why==='suspended' && k>0) break; continue; }   // и новый звук ждёт касания — дальше пробовать незачем
+      if(gone()) return cancel();
+      src=micSrc=ctx.createMediaStreamSource(s); src.connect(analyser);
+      const tr=s.getAudioTracks()[0];
+      while(tr && tr.muted && tr.readyState==='live'){                 // микрофон забрал звонок или другое приложение
+        if(onWait) onWait(MIC_BUSY);
+        await new Promise(r=>setTimeout(r,300)); if(gone()) return cancel();
+      }
+      if(await soundFlows(gone, k===2? 2*MIC_WAIT : MIC_WAIT)){ deadFrames=0; micFixes+=k; return null; }
+      if(gone()) return cancel();
+      why='silent'; try{ src.disconnect(); }catch(e){} if(micSrc===src) micSrc=null; src=null;
+    }
+    return why==='suspended'? 'tap' : micDeadMsg();
+  }catch(e){ return gone()? cancel() : 'Не получилось включить микрофон: '+e.message; }
 }
+// Браузер (обычно на компьютере) не дал включить звук без нажатия — включаем по первому касанию экрана.
+let tapWake=false;
+function onTapWake(){
+  if(!tapWake) return;
+  if(!ctx || ctx.state==='closed') newCtx();
+  ctx.resume().then(()=>{ if(tapWake && ctx.state==='running'){ tapWake=false; if(screenNow==='tune' && !running) tuneStart(); } }).catch(()=>{});
+}
+['pointerdown','pointerup','touchend','keydown','click'].forEach(t=>document.addEventListener(t,onTapWake,true));
 async function start(){
   if(!piece) return;
   stopSample();
   if(rangeStart()>rangeEnd()){ setStatus('В отрывке нет нот — выбери другие такты.','warn'); return; }
-  const err=await openMic(); if(err==='cancel') return; if(err){ setStatus(err,'bad'); return; }
+  const err=await openMic(msg=>setStatus(msg,'warn')); if(err==='cancel') return;
+  if(err==='tap'){ stop(); tapWake=true; setStatus('Нажми «Начать» ещё раз.','warn'); return; }
+  if(err){ stop(); setStatus(err,'bad'); return; }
   if(screenNow!=='play'){ stop(); return; }
   const a=rangeStart(), b=rangeEnd();
   if(uiMode==='play'){                              // в темпе — всегда с начала (отрывка), после счёта
@@ -2227,7 +2277,6 @@ function stop(){
   if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
   stopDemo();
   setStartBtn();
-  document.getElementById('tListen').textContent='Начать';
   document.getElementById('btnSkip').disabled=true;
   if(piece){ showHeard(null,piece.notes[Math.min(idx,piece.notes.length-1)]); paint(); showPlayhead(-1,null); }
 }
@@ -2239,8 +2288,9 @@ const TUNE_SHOW=1200;                  // столько мс горит зел�
 const TUNE_END=2000;                   // столько мс горит «Все струны настроены», потом настройка закрывается сама
 const T_HZ=document.getElementById('tHz').textContent;
 let tuneSel=null, tuneIdx=-1, tuneHold=0, tuneOk=[false,false,false,false], tuneWait=null;
-let tuneMute=0;                        // до этого времени играет образец «Послушать струну» — его не засчитываем
+let tuneMute=0;                        // до этого времени звучит струна по нажатию на неё — её не засчитываем
 let tuneBack='home';                   // куда вернуться после настройки
+let tuneRevive=0;                      // сколько раз настройка сама включала замолчавший микрофон заново
 const tuneHearing=()=>running && mode==='tune';
 function renderTuner(){
   const box=document.getElementById('tStrings'); box.innerHTML='';
@@ -2248,14 +2298,13 @@ function renderTuner(){
     const b=document.createElement('button');
     b.className='tchip'+(i===tuneIdx?' on':'')+(i===tuneSel?' sel':'')+(tuneOk[i]?' ok':'');
     b.innerHTML=`<b>${t.n}</b>`;
-    b.onclick=()=>{
+    b.onclick=()=>{                     // нажал на струну — она звучит, и настраиваем её
       clearTimeout(tuneWait); tuneWait=null; tuneHold=0;
-      tuneSel=(tuneSel===i? null : i); tuneIdx=i;
-      if(tuneSel==null && tuneOk[i]){ tuneIdle(i); return; }
+      tuneSel=i; tuneIdx=i;
       tuneBox(''); renderTuner(); document.getElementById('tNeedle').classList.remove('live','ok');
       document.getElementById('tNote').textContent=t.n;
       document.getElementById('tHz').textContent='';
-      tuneTip(tuneHearing()? `Проведи смычком по струне «${t.n}».` : `Нажми «Начать» и проведи смычком по струне «${t.n}».`);
+      tunePlay();
     };
     box.appendChild(b);
   });
@@ -2305,8 +2354,7 @@ function tuneIdle(from){
   tuneIdx=k; tuneBox(''); renderTuner();
   document.getElementById('tNote').textContent=TSTR[k].n;
   document.getElementById('tHz').textContent='следующая струна';
-  tuneTip(tuneHearing()? `Теперь струна «${TSTR[k].n}» — проведи смычком по ней.`
-                       : `Теперь струна «${TSTR[k].n}» — нажми «Начать» и проведи смычком по ней.`);
+  tuneTip(`Теперь струна «${TSTR[k].n}» — проведи смычком по ней.`);
 }
 function tuneFrame(p){
   if(tuneWait || (tuneSel==null && tuneOk.every(Boolean))) return;
@@ -2342,15 +2390,20 @@ function tuneFrame(p){
                : `Высоковато на ${c} — ослабь струну: винтик внизу струны — против часовой стрелки, понемногу.`, 'move');
   }
 }
-async function tuneListen(){
-  if(running && mode==='tune'){ stop(); return; }
+const TUNE_TIP='Проведи смычком по струне, не прижимая её пальцами, — ровно и долго.';
+let tuneMic='';                        // микрофон настройки: '' — выключен, 'opening' — включается, 'on' — слушает, 'tap' — ждёт касания, 'err' — не вышло
+async function tuneStart(){            // настройка слушает сама, без кнопок: при открытии и после сбоя микрофона
   stop();
-  const err=await openMic(); if(err==='cancel') return; if(err){ tuneTip(err); return; }
+  if(screenNow!=='tune') return;
+  tuneMic='opening';
+  const err=await openMic(msg=>{ if(!tuneWait) tuneTip(msg,'move'); }); if(err==='cancel') return;
   if(screenNow!=='tune'){ stop(); return; }
-  mode='tune'; running=true; tuneHold=0;
-  document.getElementById('tListen').textContent='Стоп';
+  if(err && DEBUG) dbgEl.textContent=`v15 · микрофон не включился (${err}) · звук ${ctx? ctx.state : 'нет'} · пересобран ${micFixes}`;
+  if(err==='tap'){ stop(); tuneMic='tap'; tapWake=true; tuneTip('Коснись экрана — и я начну слушать.'); return; }
+  if(err){ stop(); tuneMic='err'; tuneTip(err,'move'); return; }
+  tuneMic='on'; mode='tune'; running=true; tuneHold=0;
   if(tuneOk.some(Boolean) && !tuneWait && tuneSel==null) tuneIdle((tuneIdx+3)%4);
-  else if(!tuneWait) tuneTip('Слушаю. Проведи смычком по струне, не прижимая её пальцами.');
+  else if(!tuneWait && !(ctx.currentTime<tuneMute)) tuneTip(tuneSel!=null? `Проведи смычком по струне «${TSTR[tuneSel].n}».` : TUNE_TIP);
   if(!raf) loop_();
 }
 async function tunePlay(){
@@ -2366,24 +2419,24 @@ async function tunePlay(){
   src.connect(g); g.connect(ctx.destination);
   src.start(t0,s.start); src.stop(t0+Math.min(whole,hold+0.4));
   tuneMute=t0+Math.min(whole,hold+0.4)+0.15;
-  if(tuneHearing() && !tuneWait) tuneTip(`Слушай, как звучит струна «${t.n}», — потом сыграй её сам.`);
+  if(!tuneWait) tuneTip(`Слушай, как звучит струна «${t.n}», — потом сыграй её сам.`);
+  if(tuneMic==='err') tuneStart();      // микрофон не включился — нажатие на струну пробует ещё раз (не выйдет — снова скажет)
 }
 function openTuner(back){
   stop(); tuneBack=back||(screenNow==='play'?'play':'home');
-  tuneOk=[false,false,false,false]; tuneSel=null; tuneIdx=-1; tuneHold=0;
+  tuneOk=[false,false,false,false]; tuneSel=null; tuneIdx=-1; tuneHold=0; tuneRevive=0;
   clearTimeout(tuneWait); tuneWait=null; tuneBox('');
   document.getElementById('tNote').textContent=''; document.getElementById('tHz').textContent=T_HZ;
   document.getElementById('tNeedle').classList.remove('live','ok');
-  renderTuner(); tuneTip('Нажми «Начать» и проведи смычком по струне, не прижимая её пальцами, — ровно и долго.');
+  renderTuner(); tuneTip(TUNE_TIP);
   showScreen('tune');
+  tuneStart();
 }
 function closeTuner(){
   if(mode==='tune') stop();
-  clearTimeout(tuneWait); tuneWait=null; micReq++;
+  clearTimeout(tuneWait); tuneWait=null; micReq++; tuneMic=''; tapWake=false;
   showScreen(tuneBack==='play' && piece? 'play' : 'home');
 }
-document.getElementById('tListen').onclick=tuneListen;
-document.getElementById('tPlay').onclick=tunePlay;
 document.getElementById('tDone').onclick=closeTuner;
 /* === /движок === */
 
@@ -2716,6 +2769,7 @@ let rt=null;
 addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(screenNow==='play'){ render(); scrollToCurrent(true); } },150); });
 function refitBoard(){ if(fitBoard() && piece && screenNow==='play' && !running) drawBoard(piece.notes[Math.min(idx,piece.notes.length-1)],null); }
 if(window.ResizeObserver) new ResizeObserver(refitBoard).observe(document.getElementById('board')); else addEventListener('resize',()=>setTimeout(refitBoard,200));
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) tuneRevive=0; });   // вернулись в приложение — снова можно чинить микрофон
 addEventListener('error',e=>{ if(DEBUG && dbgEl) dbgEl.textContent='ошибка: '+e.message; });
 setUiMode(store.get('uimode','learn'), true);
 renderHome();
