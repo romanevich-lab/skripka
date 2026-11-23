@@ -1353,6 +1353,11 @@ function noteWidth(ev){                        // ширина места под
   return w;
 }
 function keySigWidth(fifths){ return fifths? Math.abs(fifths)*7.5+6 : 0; }
+// Строка нот слева направо: поле ROW_L, такты, поле ROW_R. Такт: заголовок (ключ, знаки, размер) — ноты и запас за ними
+// (natural, растягиваются ×scale) — BAR_IN — тактовая черта — BAR_OUT. Заголовки, поля и отступы у черты постоянные.
+// Одна формула и для переноса тактов, и для растяжки, и для конца стана — иначе последний такт уезжает за край.
+const ROW_L=4, ROW_R=4, BAR_IN=8, BAR_OUT=6;
+const rowWidth=(headSum, nat, n, scale)=> ROW_L + headSum + nat*scale + n*(BAR_IN+BAR_OUT) - BAR_OUT + ROW_R;
 function measureHeadWidth(m, first){ return (first? 34 : 0) + ((first||m.newKey)? keySigWidth(m.fifths) : 0) + ((m.newTime||(first&&m.i===0))? 24 : 0); }
 
 // какие знаки печатать: по тональности и знакам внутри такта (лига из прошлого такта — без знака)
@@ -1377,15 +1382,13 @@ function render(){
   piece.measures.forEach((m,i)=>m.i=i);
   const W=host.clientWidth||600, LW=W/ZOOM;
   const hasLyr=SHOW_LYR && piece.lyrics, hasNames=SHOW_NAMES;
-  // ширина такта «как хочется»
+  // растяжимая часть такта «как хочется»: ноты и запас за последней
   const natural=piece.measures.map(m=>m.events.reduce((s,e)=>s+noteWidth(e),0)+14);
-  // раскладываем такты по строкам
-  const rows=[]; let cur=[], used=0;
+  // раскладываем такты по строкам: такт переносится, если строка с ним шире окна
+  const rows=[]; let cur=[], hs=0, ns=0;
   piece.measures.forEach((m,i)=>{
-    const head=measureHeadWidth(m, cur.length===0);
-    const w=natural[i]+head;
-    if(cur.length && used+w>LW-10){ rows.push(cur); cur=[]; used=0; }
-    cur.push(i); used+=w;
+    if(cur.length && rowWidth(hs+measureHeadWidth(m,false), ns+natural[i], cur.length+1, 1)>LW){ rows.push(cur); cur=[]; hs=0; ns=0; }
+    cur.push(i); hs+=measureHeadWidth(m, cur.length===1); ns+=natural[i];
   });
   if(cur.length) rows.push(cur);
   layout={rows:[], evPos:new Map(), W, LW};
@@ -1403,16 +1406,15 @@ function render(){
     // ширины: заголовок строки + такты, растянутые на всю ширину (кроме короткой последней строки)
     const heads=idxs.map((i,k)=>measureHeadWidth(piece.measures[i], k===0));
     const nat=idxs.reduce((s,i)=>s+natural[i],0), headSum=heads.reduce((s,v)=>s+v,0);
-    const avail=LW-10-headSum;
+    const fixed=rowWidth(headSum, 0, idxs.length, 1);                   // всё, что не растягивается
     const last=ri===rows.length-1;
-    let scale= avail/nat; if(last && scale>1.35) scale=1.35; if(scale<0.6) scale=0.6;
-    const VW=Math.max(LW, headSum+nat*scale+10);
+    let scale= (LW-fixed)/nat; if(last && scale>1.35) scale=1.35; if(scale<0.6) scale=0.6;
+    const VW=Math.max(LW, rowWidth(headSum, nat, idxs.length, scale));   // не влезла и при 0.6 — строка уменьшается целиком
     svg.setAttribute('viewBox',`0 ${-extraHigh} ${VW} ${H+extraHigh}`);
     svg.setAttribute('width',W); svg.setAttribute('height',Math.round((H+extraHigh)*W/VW));
     const row={svg, measures:[], H, VW, idx:ri};
-    const endX=headSum+nat*scale+6;
-    LINE_STEPS.forEach(s=>add('line',{x1:4,x2:endX,y1:yOf(s),y2:yOf(s),class:'staffline'}));
-    let x=4;
+    const staffG=add('g',{});                                         // линейки стана — под нотами; длина — до последней черты
+    let x=ROW_L;
     idxs.forEach((mi,k)=>{
       const m=piece.measures[mi];
       const x0=x;
@@ -1440,13 +1442,15 @@ function render(){
         cx+=w;
       });
       drawMeasureEvents(add, svg, m, placed, {lyrY, nameY, H, eh:extraHigh});
-      x=mx0+mw+8;
+      x=mx0+mw+BAR_IN;
       add('line',{x1:x,x2:x,y1:yOf(38),y2:yOf(30),class:'bar'+(m.final||mi===piece.measures.length-1?' final':'')});
       if(m.final||mi===piece.measures.length-1) add('line',{x1:x-4,x2:x-4,y1:yOf(38),y2:yOf(30),class:'bar'});
-      add('rect',{x:x0,y:-extraHigh,width:x+6-x0,height:H+extraHigh,class:'mhit','data-m':mi});
+      add('rect',{x:x0,y:-extraHigh,width:x+BAR_OUT-x0,height:H+extraHigh,class:'mhit','data-m':mi});
       row.measures.push({mi,x0:mx0-2,x1:x+2});
-      x+=6;
+      x+=BAR_OUT;
     });
+    const endX=x-BAR_OUT;
+    LINE_STEPS.forEach(s=>add('line',{x1:ROW_L,x2:endX,y1:yOf(s),y2:yOf(s),class:'staffline'},null,staffG));
     add('line',{x1:0,x2:0,y1:TOP-6,y2:TOP+STAFF+6,class:'playhead','data-ph':ri}).style.display='none';
     host.appendChild(svg); layout.rows.push(row);
   });
@@ -1798,7 +1802,7 @@ function debugFrame(p){
   dbgPeak=Math.max(dbgPeak,r/g); dbgMax=Math.max(dbgMax,r/g);
   const now=performance.now(); if(now-dbgT<300) return; dbgT=now;
   const tr=micStream && micStream.getAudioTracks()[0], s=(tr && tr.getSettings)? tr.getSettings() : {};
-  dbgEl.textContent=`v15 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · пересобран ${micFixes} · микрофон ${s.sampleRate||'?'} `+
+  dbgEl.textContent=`v16 · ${IOS?'iPad':'не iPad'} · кадров ${dbgN} · звук ${ctx.state} ${ctx.sampleRate} · пересобран ${micFixes} · микрофон ${s.sampleRate||'?'} `+
     `${tr? tr.readyState+(tr.muted?' muted':'')+(tr.enabled?'':' off') : 'нет'} · громкость ${dbgPeak.toFixed(4)} (макс ${dbgMax.toFixed(4)}) ×${g} · `+
     (p? `слышу ${p.freq.toFixed(1)} Гц (${p.clarity.toFixed(2)})` : r>=GATE? 'шум, не нота' : 'тихо');
   dbgPeak=0;
@@ -2478,7 +2482,7 @@ async function tuneStart(){            // настройка слушает са
   tuneMic='opening';
   const err=await openMic(msg=>{ if(!tuneWait) tuneTip(msg,'move'); }); if(err==='cancel') return;
   if(screenNow!=='tune'){ stop(); return; }
-  if(err && DEBUG) dbgEl.textContent=`v15 · микрофон не включился (${err}) · звук ${ctx? ctx.state : 'нет'} · пересобран ${micFixes}`;
+  if(err && DEBUG) dbgEl.textContent=`v16 · микрофон не включился (${err}) · звук ${ctx? ctx.state : 'нет'} · пересобран ${micFixes}`;
   if(err==='tap'){ stop(); tuneMic='tap'; tapWake=true; tuneTip('Коснись экрана — и я начну слушать.'); return; }
   if(err){ stop(); tuneMic='err'; tuneTip(err,'move'); return; }
   tuneMic='on'; mode='tune'; running=true; tuneHold=0;
