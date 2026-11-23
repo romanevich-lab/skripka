@@ -12,12 +12,14 @@
     --accent:#2f6fed; --ok:#1f9e5a; --warn:#d99000; --warnInk:#a86200; --bad:#d2412f; --low:#7b4fd6; --star:#e8a900;
     --ok45:rgba(31,158,90,.45); --ok50:rgba(31,158,90,.5); --warn35:rgba(217,144,0,.35); --accent10:rgba(47,111,237,.1); --accent20:rgba(47,111,237,.2);
     --shadow:0 2px 10px rgba(0,0,0,.08);
+    --cardsh:0 1px 2px rgba(60,45,20,.05),0 4px 18px rgba(60,45,20,.07); --tint:rgba(47,111,237,.1); --track:rgba(118,118,128,.14);
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#14140f; --card:#1e1e19; --ink:#f0eee8; --muted:#a09a90; --line:#3a3931; --soft:#2a2a24;
            --accent:#6f9dff; --ok:#3fbf7d; --warn:#e5aa2a; --warnInk:#f0b34a; --bad:#f0685a; --low:#a88cf5; --star:#f0bb2a;
            --ok45:rgba(63,191,125,.45); --ok50:rgba(63,191,125,.5); --warn35:rgba(229,170,42,.35); --accent10:rgba(111,157,255,.12); --accent20:rgba(111,157,255,.25);
-           --shadow:0 2px 10px rgba(0,0,0,.35); }
+           --shadow:0 2px 10px rgba(0,0,0,.35);
+           --cardsh:0 0 0 1px rgba(255,255,255,.07); --tint:rgba(111,157,255,.16); --track:rgba(118,118,128,.28); }
   }
   *{box-sizing:border-box}
   [hidden]{display:none!important}
@@ -35,14 +37,16 @@
   .top .ttl b{font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .top .ttl span{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hbtns{display:flex;gap:8px;margin-left:auto}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
-  .pick{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;
-        padding:8px 14px;font-size:14px;cursor:pointer;line-height:1.3;min-height:38px}
-  .pick.q{width:38px;padding:0;font-weight:700;text-align:center}
-  .pick.back{padding-left:10px}
-  button.act{border:0;border-radius:12px;padding:12px 18px;font-weight:600;cursor:pointer;
+  .card{background:var(--card);border:0;border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:var(--cardsh)}
+  .pick{border:0;background:var(--tint);color:var(--accent);border-radius:999px;font-weight:600;
+        padding:8px 14px;font-size:14px;cursor:pointer;line-height:1.3;min-height:38px;display:inline-flex;align-items:center;gap:6px}
+  .pick svg{width:18px;height:18px;flex:none}
+  .pick.q{width:38px;padding:0;font-weight:700;justify-content:center}
+  .pick.back{background:none;padding-left:0;padding-right:6px;gap:2px;font-weight:500}
+  .pick.back svg{width:22px;height:22px}
+  button.act{border:0;border-radius:14px;padding:12px 18px;font-weight:600;cursor:pointer;
              background:var(--accent);color:#fff;min-height:46px}
-  button.act.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+  button.act.ghost{background:var(--tint);color:var(--accent);border:0;font-weight:600}
   button.act.big{font-size:18px;padding:14px 26px;min-width:150px}
   button.act.stop{background:var(--bad)}
   button.act:disabled{opacity:.4;cursor:default}
@@ -61,78 +65,109 @@
   .okflash.show{animation:okflash .9s ease-out}
   @keyframes okflash{0%{opacity:0}10%{opacity:1}70%{opacity:1}100%{opacity:0}}
 
-  /* ---- экран «что играть» ---- */
+  /* ---- экран «что играть» ----
+     Как у tonestro и в списках Apple: сверху «Дальше» — следующая мелодия одной кнопкой; урок — номер в кружке, прогресс
+     «2 из 4» с полоской; у пройденной мелодии вместо ноты — зелёная галочка; справа звёзды и стрелка «›». */
+  #scrHome>.wrap{display:flex;flex-direction:column}
+  #scrHome .top{order:0} #nextBox{order:1} #mine{order:3} #mine.has{order:2} #lessons{order:2}
+  .hero{order:1;display:flex;align-items:center;gap:16px;padding:20px 22px;border-radius:22px;color:#fff;cursor:pointer;
+        background:linear-gradient(135deg,#3d7bff 0%,#2f5fe0 55%,#5b3fd6 100%);box-shadow:0 8px 24px rgba(47,95,224,.28);margin-bottom:18px}
+  .hero .hx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .hero .hk{font-size:14px;font-weight:600;opacity:.85;letter-spacing:.01em}
+  .hero b{font-size:24px;font-weight:700;line-height:1.2}
+  .hero .hs{font-size:15px;opacity:.85}
+  .hero .go{flex:none;border:0;border-radius:999px;background:#fff;color:#2f5fe0;font-weight:700;font-size:17px;padding:12px 22px;min-height:48px;cursor:pointer;
+            display:inline-flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+  .hero .go svg{width:16px;height:16px}
   .lesson{padding:0;overflow:hidden}
-  .lesson .lh{display:flex;align-items:baseline;gap:10px;padding:12px 16px 8px;flex-wrap:wrap}
-  .lesson .lh b{font-size:17px}
-  .lesson .lh span{font-size:13px;color:var(--muted)}
+  .lesson .lh{display:flex;align-items:center;gap:12px;padding:14px 16px 10px}
+  .lesson .ln{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+              background:var(--tint);color:var(--accent);font-weight:700;font-size:16px}
+  .lesson .ln.done{background:var(--ok);color:#fff}
+  .lesson .lt2{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.25}
+  .lesson .lt2 b{font-size:17px;font-weight:700}
+  .lesson .lt2 span{font-size:13px;color:var(--muted)}
+  .lesson .lp{flex:none;font-size:13px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+  .lbar{height:4px;margin:0 16px 10px 62px;border-radius:2px;background:var(--track);overflow:hidden}
+  .lbar i{display:block;height:100%;background:var(--ok);border-radius:2px}
   .plist{display:flex;flex-direction:column}
-  .prow{display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid var(--line);cursor:pointer;background:transparent;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left}
+  .prow{display:flex;align-items:center;gap:12px;padding:11px 14px 11px 16px;cursor:pointer;background:transparent;border:0;width:100%;text-align:left;
+        position:relative;color:var(--ink)}
+  .prow+.prow::before,.lbar+.plist .prow:first-child::before{content:'';position:absolute;top:0;left:62px;right:0;height:1px;background:var(--line);opacity:.7}
   .prow:active{background:var(--soft)}
-  .prow .pi{width:34px;height:34px;border-radius:50%;background:var(--accent10);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+  .prow .pi{width:34px;height:34px;border-radius:50%;background:var(--tint);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+  .prow .pi.done{background:rgba(31,158,90,.14);color:var(--ok);font-weight:800}
+  .prow.next .pi{background:var(--accent);color:#fff}
   .prow .pt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
   .prow .pt b{font-weight:600;font-size:16px}
   .prow .pt span{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .prow .stars{font-size:15px;letter-spacing:1px;color:var(--line);flex:none}
+  .prow .stars{font-size:14px;letter-spacing:1px;color:var(--line);flex:none}
   .prow .stars.s1 i:nth-child(1),.prow .stars.s2 i:nth-child(-n+2),.prow .stars.s3 i{color:var(--star)}
   .prow .stars i{font-style:normal}
+  .prow .chev{flex:none;color:var(--muted);opacity:.55;font-size:22px;line-height:1;margin-left:-2px}
   .prow .del{border:0;background:transparent;color:var(--muted);font-size:18px;padding:6px 8px;cursor:pointer;flex:none;border-radius:8px}
   .prow .del:hover{background:var(--soft)}
   .sec-h{display:flex;align-items:baseline;gap:10px;margin:0 0 6px}
   .sec-h span{font-size:13px;color:var(--muted)}
-  .empty{color:var(--muted);font-size:14px;padding:6px 0 10px}
+  #mine .sec-h{padding:2px 0 4px}
+  #mine .plist{margin:0 -16px 8px}
+  .empty{color:var(--muted);font-size:14px;padding:2px 0 12px}
   .load-steps{font-size:14px;color:var(--muted);margin:10px 0 0;line-height:1.5}
 
   /* ---- экран игры ---- */
-  .modes{display:flex;gap:0;background:var(--soft);border-radius:12px;padding:3px;margin:0 0 12px;width:max-content;max-width:100%}
-  .modes button{border:0;background:transparent;border-radius:10px;padding:9px 18px;font-size:15px;font-weight:600;color:var(--muted);cursor:pointer;min-height:40px}
-  .modes button.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+  .modes{display:flex;gap:0;background:var(--track);border-radius:12px;padding:3px;margin:0 0 12px;width:max-content;max-width:100%}
+  .modes button{border:0;background:transparent;border-radius:10px;padding:9px 18px;font-size:15px;font-weight:600;color:var(--ink);opacity:.7;cursor:pointer;min-height:40px}
+  .modes button.on{background:var(--card);opacity:1;box-shadow:0 1px 3px rgba(0,0,0,.12),0 3px 8px rgba(0,0,0,.06)}
   .playrow{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px}
   .playrow #sheetCard{flex:1;min-width:0;margin-bottom:0;position:relative;overflow-y:auto;
                       height:min(460px,calc(100vh - 20px));padding:6px 10px}
   .vmeter{position:sticky;top:8px;width:84px;flex:none;margin-bottom:0;padding:10px 8px;
           display:flex;flex-direction:column;align-items:center;text-align:center;
           height:min(460px,calc(100vh - 20px))}
-  .vmeter .lab{font-size:11px;color:var(--muted);line-height:1.2}
-  .vmeter .hz{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;min-height:1.45em}
-  .vmeter .nm{font-size:19px;font-weight:600;line-height:1.1;hyphens:none}
+  .vmeter .lab{font-size:11px;color:var(--muted);line-height:1.2;font-weight:600}
+  .vmeter .hz{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;min-height:1.45em;color:var(--muted)}
+  .vmeter .nm{font-family:ui-rounded,-apple-system,system-ui,sans-serif;font-size:19px;font-weight:600;line-height:1.1;hyphens:none}
   .vmeter .want{color:var(--accent)}
-  .vmeter .end{font-size:11px;color:var(--muted);margin:6px 0 2px}
+  .vmeter .end{font-size:11px;color:var(--muted);margin:6px 0 4px;font-weight:500}
   .fboard{position:sticky;top:8px;width:92px;flex:none;margin-bottom:0;padding:8px 4px;
           display:flex;flex-direction:column;align-items:center;text-align:center;
           height:min(460px,calc(100vh - 20px))}
   .fboard svg{flex:1;min-height:0;width:100%}
-  .fb-wood{fill:#2b2620} .fb-nut{fill:#e9e2d0} .fb-str{stroke:#cfc8b8;stroke-width:1.3}
-  .fb-tape{stroke:#8a8273;stroke-width:1;stroke-dasharray:2 2}
-  .fb-lab{fill:var(--ink);font-size:11px;font-weight:600;text-anchor:middle}
-  .fb-want{fill:var(--accent)} .fb-want-t{fill:#fff;font-size:10px;font-weight:700;text-anchor:middle}
-  .fb-open{fill:none;stroke:var(--accent);stroke-width:2.5}
-  .fb-heard{fill:var(--warn)} .fb-heard.ok{fill:var(--ok)}
-  .fb-arrow{stroke:var(--warn);stroke-width:2.5;fill:none}
-  .fb-head{fill:var(--warn)}
-  .fb-used{fill:none;stroke:#cfc8b8;stroke-width:1.2;opacity:.7}
-  .fbtip{font-size:12px;line-height:1.25;min-height:46px;margin-top:4px;font-weight:600}
-  .fbtip.ok{color:var(--ok)} .fbtip.move{color:var(--warn)}
+  /* гриф нарисован как настоящий: эбеновое дерево, костяной порожек, металлические струны разной толщины,
+     светлые наклейки-метки (такие клеят начинающим) там, где ставятся пальцы */
+  .fb-lab{fill:var(--muted);font-size:10.5px;font-weight:600;text-anchor:middle}
+  .fb-want{fill:var(--accent);stroke:#fff;stroke-width:2} .fb-want-t{fill:#fff;font-size:10px;font-weight:700;text-anchor:middle}
+  .fb-open{fill:none;stroke:var(--accent);stroke-width:3}
+  .fb-heard{fill:#ff8a00;stroke:#fff;stroke-width:1.5} .fb-heard.ok{fill:var(--ok)}
+  .fb-arrow{stroke:#ff8a00;stroke-width:3;fill:none;stroke-linecap:round}
+  .fb-head{fill:#ff8a00}
+  .fb-used{fill:none;stroke:#fff;stroke-width:1.3;opacity:.35}
+  .fbtip{font-size:12px;line-height:1.25;min-height:46px;margin-top:6px;font-weight:600}
+  .fbtip.ok{color:var(--ok)} .fbtip.move{color:var(--warnInk)}
   @media (max-width:520px){
     .playrow{gap:6px} .playrow #sheetCard{padding:8px 6px}
     .vmeter{width:70px;padding:8px 4px} .fboard{width:70px} .vmeter .nm{font-size:16px} .vmeter .hz{font-size:12px}
     .modes button{padding:9px 10px}
+    #btnTune .tl,#btnTune2 .tl{display:none}    /* на телефоне у кнопки настройки — только значок камертона */
+    .hero{flex-direction:column;align-items:stretch;gap:14px} .hero .go{justify-content:center}
+    .sec-h{flex-direction:column;gap:0}
   }
-  /* шкала ±50 центов: 1 цент = 1% высоты; зелёная зона — «чисто» по выбранному уровню (--c), жёлтая — ещё 15 центов */
-  .needle{--c:20%;--w:35%;position:relative;flex:1;min-height:120px;width:40px;border-radius:8px;overflow:hidden;
+  /* шкала ±50 центов: 1 цент = 1% высоты; зелёная зона — «чисто» по выбранному уровню (--c), янтарная — ещё 15 центов;
+     деления через 10 центов по краям, как у шкалы настройки */
+  .needle{--c:20%;--w:35%;position:relative;flex:1;min-height:120px;width:40px;border-radius:12px;overflow:hidden;
           background:linear-gradient(180deg,
-            var(--line) 0%, var(--line) calc(50% - var(--w)),
-            var(--warn35) calc(50% - var(--w)),
-            var(--warn35) calc(50% - var(--c)),
-            var(--ok45) calc(50% - var(--c)),
-            var(--ok45) calc(50% + var(--c)),
-            var(--warn35) calc(50% + var(--c)),
-            var(--warn35) calc(50% + var(--w)),
-            var(--line) calc(50% + var(--w)), var(--line) 100%);}
-  .needle i{position:absolute;left:0;right:0;top:50%;height:5px;margin-top:-2.5px;background:var(--ink);
-            border-radius:2px;transition:top .06s linear;opacity:.15}
-  .needle i.live{opacity:1}
-  .needle u{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--ink);opacity:.35}
+            var(--track) 0%, var(--track) calc(50% - var(--w)),
+            rgba(217,144,0,.16) calc(50% - var(--w)), rgba(217,144,0,.16) calc(50% - var(--c)),
+            rgba(31,158,90,.2) calc(50% - var(--c)), rgba(31,158,90,.2) calc(50% + var(--c)),
+            rgba(217,144,0,.16) calc(50% + var(--c)), rgba(217,144,0,.16) calc(50% + var(--w)),
+            var(--track) calc(50% + var(--w)), var(--track) 100%);}
+  .needle::before,.needle::after{content:'';position:absolute;top:0;bottom:0;width:22%;
+          background:repeating-linear-gradient(180deg,transparent 0,transparent calc(10% - 1.5px),rgba(120,110,95,.35) calc(10% - 1.5px),rgba(120,110,95,.35) 10%)}
+  .needle::before{left:0} .needle::after{right:0}
+  .needle i{position:absolute;left:3px;right:3px;top:50%;height:6px;margin-top:-3px;background:var(--ink);z-index:1;
+            border-radius:3px;transition:top .06s linear,background .15s;opacity:.15;box-shadow:0 0 0 2px var(--card)}
+  .needle i.live{opacity:1} .needle i.ok{background:var(--ok)}
+  .needle u{position:absolute;left:0;right:0;top:50%;height:2px;margin-top:-1px;background:var(--ok);opacity:.8}
 
   /* ноты */
   #sheet{overflow-x:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none}
@@ -167,14 +202,14 @@
   .mloop-lab{fill:var(--accent);font-size:11px;font-weight:700}
   #sheet g[class] .nh.hollow{fill:none}
   .n-cur .hl{opacity:.16}
-  .n-ok .hl,.n-mid .hl,.n-bad .hl{fill:var(--ok);opacity:.22}
+  .n-ok .hl,.n-mid .hl,.n-bad .hl{fill:var(--ok);opacity:.12}
   .n-cur .nh,.n-cur .nh.hollow{fill:var(--accent);stroke:var(--accent);stroke-width:3}
   .n-cur .stem{stroke:var(--accent);stroke-width:2.6} .n-cur .acc{fill:var(--accent)} .n-cur .beam,.n-cur .flag{fill:var(--accent)}
   .n-cur .fing{fill:var(--accent);font-size:21px;font-weight:700}
   .n-ok .nh,.n-ok .nh.hollow{fill:var(--ok);stroke:var(--ok)} .n-ok .stem{stroke:var(--ok)} .n-ok .acc,.n-ok .flag{fill:var(--ok)}
   .n-mid .nh,.n-mid .nh.hollow{fill:var(--warn);stroke:var(--warn)} .n-mid .stem{stroke:var(--warn)} .n-mid .acc,.n-mid .flag{fill:var(--warn)}
   .n-bad .nh,.n-bad .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-bad .stem{stroke:var(--bad)} .n-bad .acc,.n-bad .flag{fill:var(--bad)}
-  .n-hi .hl,.n-wrong .hl{fill:var(--bad);opacity:.22} .n-lo .hl{fill:var(--low);opacity:.24} .n-miss .hl{fill:var(--muted);opacity:.2} .n-skip .hl{fill:var(--muted);opacity:.14}
+  .n-hi .hl,.n-wrong .hl{fill:var(--bad);opacity:.13} .n-lo .hl{fill:var(--low);opacity:.14} .n-miss .hl{fill:var(--muted);opacity:.13} .n-skip .hl{fill:var(--muted);opacity:.1}
   .n-wrong .nh,.n-wrong .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-wrong .stem{stroke:var(--bad)} .n-wrong .acc,.n-wrong .flag{fill:var(--bad)}
   .ghost{fill:var(--bad);stroke:var(--card);stroke-width:1.5}
   .n-hi .nh,.n-hi .nh.hollow{fill:var(--bad);stroke:var(--bad)} .n-hi .stem{stroke:var(--bad)} .n-hi .acc,.n-hi .flag{fill:var(--bad)}
@@ -188,8 +223,8 @@
 
   /* нижняя полоса: что нужно + что говорит программа */
   #targetCard{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
-  .bignote{font-size:40px;font-weight:700;line-height:1;min-width:120px}
-  .bignote b{font-weight:700}
+  .bignote{font-size:40px;font-weight:600;line-height:1;min-width:120px}
+  .bignote b{font-family:ui-rounded,-apple-system,system-ui,sans-serif;font-weight:600}
   .bignote small{display:block;font-size:13px;font-weight:400;color:var(--muted);margin-top:6px}
   .bignote small i{font-style:normal}
   #targetCard .bignote{order:1}
@@ -197,25 +232,29 @@
   #targetCard .ctrl{order:3;flex:1 1 260px}
   #targetCard .tempo{flex-basis:100%}
   #targetCard .legend{order:4;flex-basis:100%}
-  .status.ok{color:var(--ok)} .status.warn{color:var(--warn)} .status.bad{color:var(--bad)}
+  .status.ok{color:var(--ok)} .status.warn{color:var(--warnInk)} .status.bad{color:var(--bad)}
   .ctrl{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
   .ctrl .sep{flex-basis:100%;height:0}
   .chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--accent);color:var(--accent);background:var(--accent10);
         border-radius:999px;padding:6px 8px 6px 12px;font-size:14px;font-weight:600}
   .chip button{border:0;background:transparent;color:inherit;font-size:16px;padding:0 4px;cursor:pointer;line-height:1}
   .tempo{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-  .tempo input[type=number]{width:64px;padding:7px 4px;border:1px solid var(--line);border-radius:10px;background:transparent;
-                            color:var(--ink);font:inherit;font-weight:600;text-align:center;font-size:16px}
-  .tempo .step{width:40px;padding:6px 0;font-size:18px;line-height:1.2}
+  .tempo input[type=number]{width:64px;padding:7px 4px;border:0;border-radius:10px;background:var(--track);-moz-appearance:textfield;
+                            color:var(--ink);font:inherit;font-weight:700;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
+  .tempo input::-webkit-outer-spin-button,.tempo input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .tempo .step{width:40px;padding:6px 0;font-size:20px;line-height:1.2;justify-content:center}
   .lt{font-size:14px;color:var(--muted);margin-right:2px}
-  .chk{display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
-  .chk input{width:18px;height:18px}
-  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
+  .chk{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
+  /* галочки — переключателями, как на iPad */
+  .chk input{-webkit-appearance:none;appearance:none;flex:none;width:40px;height:24px;border-radius:12px;background:var(--track);position:relative;margin:0;cursor:pointer;transition:background .18s}
+  .chk input::before{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s}
+  .chk input:checked{background:var(--ok)} .chk input:checked::before{transform:translateX(16px)}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);font-weight:500}
   .legend i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:5px;vertical-align:-1px}
   .opts{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;font-size:14px}
   .opts label{display:flex;align-items:center;gap:6px}
-  .opts select,.sel{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;
-               padding:7px 10px;font:inherit;font-size:14px;cursor:pointer;min-height:38px}
+  .opts select,.sel{border:0;color:var(--ink);border-radius:10px;padding:7px 30px 7px 12px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;min-height:38px;
+               -webkit-appearance:none;appearance:none;background:var(--track) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238e8e93' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 11px center/11px 8px}
 
   /* настройка скрипки — по образцу ведущих тюнеров (GuitarTuna, Fender Tune, Simply Tuner, LikeTones):
      шкала со стрелкой и нотой посередине, под ней короткая подсказка, ниже — низ скрипки: подставка, струны, винтики;
@@ -322,7 +361,7 @@
     .modes button{min-height:44px;font-size:17px}
     .opts{font-size:15px;gap:8px 12px}
     .opts select,.sel{min-height:44px;font-size:15px;padding:7px 8px}
-    .lt{font-size:15px} .chk{font-size:15px} .chk input{width:22px;height:22px}
+    .lt{font-size:15px} .chk{font-size:15px} .chk input{width:46px;height:28px;border-radius:14px} .chk input::before{width:24px;height:24px} .chk input:checked::before{transform:translateX(18px)}
     .modes button{padding:10px 16px}
     #scrPlay .playrow{flex:1;min-height:0;align-items:stretch;margin-bottom:10px}
     #scrPlay .playrow #sheetCard,#scrPlay .vmeter,#scrPlay .fboard{height:auto;position:static}
@@ -352,7 +391,7 @@
       #scrPlay #targetCard{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"note status legend" "ctrl ctrl ctrl"}
       .bignote{flex-direction:row;align-items:center;gap:16px}
       #targetCard .legend{max-width:330px;display:grid;grid-template-columns:auto auto;gap:1px 16px;line-height:1.3}
-      #targetCard .legend>span:last-child{grid-column:1 / -1}
+      #targetCard .legend #legWrong{grid-column:1 / -1}
     }
     .legend{font-size:15px} .legend i{width:14px;height:14px}
     .tempo input[type=number]{width:76px;font-size:19px;min-height:44px} .tempo .step{width:48px;font-size:22px}
@@ -379,11 +418,18 @@
     #scrHome>.wrap.narrow{max-width:1180px}
     #lessons{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;align-items:start}
     #lessons .card{margin-bottom:0}
-    .lesson .lh b{font-size:20px} .lesson .lh span{font-size:15px}
-    .prow{padding:13px 18px;min-height:68px}
+    .lesson .lh{padding:18px 20px 12px;gap:14px}
+    .lesson .ln{width:42px;height:42px;font-size:19px}
+    .lesson .lt2 b{font-size:20px} .lesson .lt2 span{font-size:15px} .lesson .lp{font-size:15px}
+    .lbar{margin:0 20px 12px 76px}
+    .prow{padding:13px 16px 13px 20px;min-height:68px;gap:14px}
+    .prow+.prow::before,.lbar+.plist .prow:first-child::before{left:76px}
     .prow .pi{width:42px;height:42px;font-size:19px}
     .prow .pt b{font-size:18px} .prow .pt span{font-size:15px}
-    .prow .stars{font-size:21px}
+    .prow .stars{font-size:20px}
+    .prow .chev{font-size:26px}
+    .hero{padding:24px 28px;margin-bottom:20px} .hero .hk{font-size:16px} .hero b{font-size:30px} .hero .hs{font-size:17px}
+    .hero .go{font-size:20px;padding:14px 28px;min-height:56px} .hero .go svg{width:18px;height:18px}
     .empty{font-size:16px}
   }
 </style>
@@ -426,14 +472,15 @@
 <section class="screen" id="scrHome" hidden>
   <div class="wrap narrow">
     <header class="top"><h1>Что играть</h1>
-      <div class="hbtns"><button class="pick" id="btnTune">Настроить скрипку</button><button class="pick q" id="btnHelp" aria-label="как это работает">?</button></div>
+      <div class="hbtns"><button class="pick" id="btnTune" aria-label="Настроить скрипку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7.5a4 4 0 0 0 8 0V2.5"/><path d="M12 14v7.5"/></svg><span class="tl">Настроить скрипку</span></button><button class="pick q" id="btnHelp" aria-label="как это работает">?</button></div>
     </header>
+    <div id="nextBox"></div>
     <div class="card" id="mine">
       <div class="sec-h"><h2 style="margin:0">Мои ноты</h2><span>свои файлы и набранные мелодии</span></div>
       <div id="mineList" class="plist"></div>
       <div class="empty" id="mineEmpty">Пока пусто. Загрузи файл с нотами (MusicXML, MIDI, ABC) или набери мелодию текстом.</div>
       <div class="btns">
-        <button class="act" id="btnLoad">Загрузить ноты…</button>
+        <button class="act ghost" id="btnLoad">Загрузить ноты…</button>
         <button class="act ghost" id="btnType">Набрать ноты</button>
       </div>
       <input type="file" id="fileIn" hidden multiple>
@@ -446,9 +493,9 @@
 <section class="screen" id="scrPlay" hidden>
   <div class="wrap">
     <header class="top">
-      <button class="pick back" id="btnBack">← Что играть</button>
+      <button class="pick back" id="btnBack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Что играть</button>
       <div class="ttl"><b id="pTitle"></b><span id="pSub"></span></div>
-      <div class="hbtns"><button class="pick" id="btnTune2">Настроить скрипку</button><button class="pick q" id="btnHelp2" aria-label="как это работает">?</button></div>
+      <div class="hbtns"><button class="pick" id="btnTune2" aria-label="Настроить скрипку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7.5a4 4 0 0 0 8 0V2.5"/><path d="M12 14v7.5"/></svg><span class="tl">Настроить скрипку</span></button><button class="pick q" id="btnHelp2" aria-label="как это работает">?</button></div>
     </header>
     <div class="toolrow">
       <div class="modes" id="modes">
@@ -508,7 +555,8 @@
         <span><i style="background:var(--ok)"></i>чисто</span>
         <span><i style="background:var(--bad)"></i>высоко</span>
         <span><i style="background:var(--low)"></i>низко</span>
-        <span><i style="background:var(--bad);box-shadow:inset 0 0 0 2px var(--card)"></i><span id="legWrong">не та нота (точка рядом — что услышала) · </span><i style="background:var(--muted)"></i><span id="legMiss">не услышал</span></span>
+        <span><i style="background:var(--muted)"></i><span id="legMiss">не услышал</span></span>
+        <span id="legWrong"><i style="background:var(--bad);box-shadow:inset 0 0 0 2px var(--card)"></i>не та нота (точка рядом — что услышала)</span>
       </div>
     </div>
   </div>
@@ -1622,11 +1670,15 @@ function drawBoard(target, midiF){
   if(!svg) return;
   let out='';
   const el=(tag,a,t='')=>{out+='<'+tag; for(const k in a) out+=` ${k}="${a[k]}"`; out+='>'+t+'</'+tag+'>';};
-  el('rect',{x:6,y:FB.top,width:84,height:FB.len+14,rx:4,class:'fb-wood'});
-  el('rect',{x:4,y:FB.top-4,width:88,height:5,rx:1.5,class:'fb-nut'});
-  ['соль','ре','ля','ми'].forEach((n,i)=>el('text',{x:FB.x[i],y:FB.top-(i%2? 14 : 27),class:'fb-lab'},n));
-  [2,4,5].forEach(d=>el('line',{x1:8,x2:88,y1:fbY(d),y2:fbY(d),class:'fb-tape'}));
-  FB.x.forEach(x=>el('line',{x1:x,x2:x,y1:FB.top,y2:FB.top+FB.len+14,class:'fb-str'}));
+  const B=FB.top+FB.len+14;                                                     // нижний конец грифа
+  out+='<defs><linearGradient id="fbEb" x1="0" x2="1"><stop offset="0" stop-color="#14110e"/><stop offset=".5" stop-color="#2f2924"/><stop offset="1" stop-color="#14110e"/></linearGradient></defs>';
+  el('path',{d:`M10 ${FB.top} L86 ${FB.top} L91 ${B-10} Q91 ${B} 81 ${B} L15 ${B} Q5 ${B} 5 ${B-10} Z`,fill:'url(#fbEb)',stroke:'#fff','stroke-opacity':.1});   // эбеновый гриф, книзу шире
+  el('rect',{x:7,y:FB.top-5,width:82,height:6,rx:2,fill:'#efe6cf',stroke:'#c9b993','stroke-width':.8});                    // порожек
+  ['соль','ре','ля','ми'].forEach((n,i)=>el('text',{x:FB.x[i],y:FB.top-(i%2? 12 : 25),class:'fb-lab'},n));
+  [2,4,5].forEach(d=>el('rect',{x:7,y:(fbY(d)-1.8).toFixed(1),width:82,height:3.6,rx:1,fill:'#eef2f8',opacity:.8}));   // наклейки-метки
+  const SW=[2.3,1.9,1.5,1.1];                                                    // струны: соль толще всех, ми тоньше
+  FB.x.forEach((x,i)=>{ el('line',{x1:x+.9,x2:x+.9,y1:FB.top,y2:B,stroke:'#000','stroke-opacity':.55,'stroke-width':SW[i]+.8});
+                        el('line',{x1:x,x2:x,y1:FB.top-5,y2:B,stroke:i?'#e3e5e8':'#c9ccd0','stroke-width':SW[i]}); });
   // все места пальцев в этой мелодии — тонкими кольцами
   if(piece && piece.places) piece.places.forEach(k=>{ const [i,d]=k.split(':').map(Number); if(d>0) el('circle',{cx:FB.x[i],cy:fbY(d),r:6,class:'fb-used'}); });
   tip.textContent=''; tip.className='fbtip';
@@ -1634,7 +1686,7 @@ function drawBoard(target, midiF){
   if(p){
     const x=FB.x[p.i], ty=fbY(p.d);
     if(p.d===0) el('circle',{cx:x,cy:FB.top-2,r:7,class:'fb-open'});
-    else { el('circle',{cx:x,cy:ty,r:8,class:'fb-want'}); el('text',{x:x,y:ty+3.5,class:'fb-want-t'},FING[p.d].charAt(0)); }
+    else { el('circle',{cx:x,cy:ty,r:9,class:'fb-want'}); el('text',{x:x,y:ty+3.6,class:'fb-want-t'},FING[p.d].charAt(0)); }
     if(midiF!=null){
       const diff=(midiF-target.midi)*100;
       if(Math.abs(diff)<=CLEAN){ tip.textContent='✓ на месте'; tip.className='fbtip ok'; }
@@ -2163,7 +2215,7 @@ function showHeard(h,target){
   const hn=document.getElementById('heardNote'), hi=document.getElementById('heardInfo');
   const nd=document.getElementById('needle');
   const hd=document.getElementById('heardDev');
-  if(!h){ hn.textContent='·'; hi.textContent='тишина'; hd.textContent=''; nd.classList.remove('live'); nd.style.top='50%'; return; }
+  if(!h){ hn.textContent='·'; hi.textContent='тишина'; hd.textContent=''; nd.classList.remove('live','ok'); nd.style.top='50%'; return; }
   const nm=midiToName(h.midi);
   hn.textContent=nm.ru;
   hi.textContent=nm.lat;
@@ -2173,7 +2225,7 @@ function showHeard(h,target){
   const diff=(69+12*Math.log2(h.freq/440)-target.midi)*100;
   if(h.midi===target.midi) hd.textContent=offText(Math.round(diff));     // та самая нота — насколько мимо
   const c=Math.max(-50,Math.min(50,diff));
-  nd.style.top=(50-c)+'%';
+  nd.style.top=(50-c)+'%'; nd.classList.toggle('ok',Math.abs(diff)<=CLEAN);
 }
 
 function updateTarget(){
@@ -2576,27 +2628,48 @@ function showScreen(name){
 }
 
 function starsHtml(n){ return `<span class="stars s${n||0}"><i>★</i><i>★</i><i>★</i></span>`; }
+const pieceDone=id=>(progress[id]||{}).stars>0;                 // мелодия пройдена: хоть одна звезда
+// «Дальше»: первая непройденная мелодия по порядку уроков; все пройдены — та, где меньше всего звёзд; везде три — ничего
+function nextPiece(){
+  for(const les of LESSONS) for(const p of les.pieces) if(!pieceDone(p.id)) return {les,p};
+  let best=null; for(const les of LESSONS) for(const p of les.pieces){ const n=progress[p.id].stars; if(n<3 && (!best || n<best.n)) best={les,p,n}; }
+  return best;
+}
+const openLessonPiece=(les,p)=>openPiece({id:p.id, title:p.title, sub:p.sub, text:p.text, lesson:les.title});
+const lessonName=t=>t.replace(/^\d+\.\s*/,'');
+const playsText=n=>n? ' · сыграно '+n+' '+plural(n,'раз','раза','раз') : '';
 function renderHome(){
+  const nx=nextPiece(), NB=document.getElementById('nextBox'); NB.innerHTML='';
+  if(nx){
+    const h=document.createElement('div'); h.className='hero';
+    h.innerHTML=`<div class="hx"><span class="hk">${progress[nx.p.id]? 'Сыграть ещё раз' : 'Дальше'} · ${lessonName(nx.les.title)}</span><b>${nx.p.title}</b><span class="hs">${nx.p.sub||''}</span></div>
+      <button class="go"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Играть</button>`;
+    h.onclick=()=>openLessonPiece(nx.les,nx.p);
+    NB.appendChild(h);
+  }
   const L=document.getElementById('lessons'); L.innerHTML='';
   LESSONS.forEach((les,li)=>{
+    const n=les.pieces.length, k=les.pieces.filter(p=>pieceDone(p.id)).length;
     const card=document.createElement('div'); card.className='card lesson';
-    card.innerHTML=`<div class="lh"><b>${les.title}</b><span>${les.desc}</span></div><div class="plist"></div>`;
+    card.innerHTML=`<div class="lh"><span class="ln${k===n?' done':''}">${k===n?'✓':li+1}</span><div class="lt2"><b>${lessonName(les.title)}</b><span>${les.desc}</span></div><span class="lp">${k} из ${n}</span></div>
+      <div class="lbar"><i style="width:${Math.round(100*k/n)}%"></i></div><div class="plist"></div>`;
     const list=card.querySelector('.plist');
     les.pieces.forEach(p=>{
-      const pr=progress[p.id]||{};
-      const b=document.createElement('button'); b.className='prow';
-      b.innerHTML=`<span class="pi">♪</span><span class="pt"><b>${p.title}</b><span>${p.sub||''}${pr.plays? ' · сыграно '+pr.plays+' раз':''}</span></span>${starsHtml(pr.stars)}`;
-      b.onclick=()=>openPiece({id:p.id, title:p.title, sub:p.sub, text:p.text, lesson:les.title});
+      const pr=progress[p.id]||{}, ok=pieceDone(p.id), isNext= nx && nx.p===p;
+      const b=document.createElement('button'); b.className='prow'+(isNext?' next':'');
+      b.innerHTML=`<span class="pi${ok?' done':''}">${ok?'✓':'♪'}</span><span class="pt"><b>${p.title}</b><span>${p.sub||''}${playsText(pr.plays)}</span></span>${starsHtml(pr.stars)}<span class="chev">›</span>`;
+      b.onclick=()=>openLessonPiece(les,p);
       list.appendChild(b);
     });
     L.appendChild(card);
   });
   const M=document.getElementById('mineList'); M.innerHTML='';
   document.getElementById('mineEmpty').hidden=userPieces.length>0;
+  document.getElementById('mine').classList.toggle('has',userPieces.length>0);   // свои ноты есть — они выше уроков
   userPieces.slice().reverse().forEach(u=>{
     const pr=progress[u.id]||{};
     const row=document.createElement('div'); row.className='prow'; row.style.cursor='pointer';
-    row.innerHTML=`<span class="pi">♪</span><span class="pt"><b>${esc(u.title)}</b><span>${esc(u.sub||'')}${pr.plays? ' · сыграно '+pr.plays+' раз':''}</span></span>${starsHtml(pr.stars)}<button class="del" aria-label="удалить">🗑</button>`;
+    row.innerHTML=`<span class="pi${pieceDone(u.id)?' done':''}">${pieceDone(u.id)?'✓':'♪'}</span><span class="pt"><b>${esc(u.title)}</b><span>${esc(u.sub||'')}${playsText(pr.plays)}</span></span>${starsHtml(pr.stars)}<button class="del" aria-label="удалить">🗑</button>`;
     row.onclick=e=>{ if(e.target.closest('.del')){ if(confirm(`Удалить «${u.title}» из моих нот?`)){ userPieces=userPieces.filter(x=>x.id!==u.id); saveUser(); renderHome(); } return; } openPiece(u); };
     M.appendChild(row);
   });
